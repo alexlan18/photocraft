@@ -1904,7 +1904,14 @@ fn field_rows(ui: &mut egui::Ui, section: &str, obj: &mut Map<String, Value>, ke
                 ui.label(RichText::new(tl!(&label)).color(t.text_dim));
                 let mut s = s.clone();
                 // The Agent panel's API key is a secret: shown as dots, like a password field.
-                ui.add(egui::TextEdit::singleline(&mut s).desired_width(260.0).password(path == "integrations.agentApiKey"));
+                // Empty agent fields use a default, shown as the field's hint.
+                let hint = match path.as_str() {
+                    "integrations.agentModel" => photocraft_engine::agent::DEFAULT_MODEL,
+                    "integrations.agentBaseUrl" => photocraft_engine::agent::DEFAULT_BASE_URL,
+                    "integrations.agentApiKey" => photocraft_engine::agent::API_KEY_ENV,
+                    _ => "",
+                };
+                ui.add(egui::TextEdit::singleline(&mut s).desired_width(260.0).password(path == "integrations.agentApiKey").hint_text(hint));
                 obj.insert(k, json!(s));
             }
             Value::Number(n) => {

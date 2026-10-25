@@ -235,6 +235,13 @@ pub fn stop(app: &mut PhotocraftApp) {
     }
 }
 
+/// The header's settings button: Edit › Preferences opened on AI Integrations, where the agent's
+/// model, effort, API key and endpoint are. (Running the `edit.preferences.integrations` command
+/// only returns that section's values; the dialog is the shell's.) Returns the dialog id.
+pub fn open_settings(app: &mut PhotocraftApp) -> u64 {
+    crate::prefs_ui::open_preferences(app, "integrations")
+}
+
 /// Forget the conversation and end the session; the next message starts a new one with the
 /// current Preferences.
 pub fn clear(app: &mut PhotocraftApp) {
@@ -312,7 +319,7 @@ fn header(app: &mut PhotocraftApp, ui: &mut egui::Ui, t: &Tokens) {
                 app.ui.agent.collapsed = true;
             }
             if icons::rail_button(ui, "settings", 22.0, false, tl!("Agent settings (Preferences › AI Integrations)")).clicked() {
-                let _ = app.run("edit.preferences.integrations", json!({}));
+                open_settings(app);
             }
             let can_clear = !app.ui.agent.transcript.is_empty() || app.agent.handle.is_some();
             if can_clear && icons::rail_button(ui, "trash", 22.0, false, tl!("Clear conversation")).clicked() {
@@ -644,6 +651,18 @@ mod tests {
         saved.as_object_mut().unwrap().remove("agent");
         let p: crate::state::Panels = serde_json::from_value(saved).unwrap();
         assert!(p.agent, "a layout saved before the panel existed shows it");
+    }
+
+    #[test]
+    fn the_settings_button_opens_preferences_on_ai_integrations() {
+        let mut app = desktop_app();
+        let id = open_settings(&mut app);
+        let dialog = app.ui.dialog_mut(id).expect("the Preferences dialog is open");
+        assert_eq!(dialog.fields["section"], "integrations");
+        let section = &dialog.fields["values"]["integrations"];
+        for key in ["agentModel", "agentEffort", "agentApiKey", "agentBaseUrl"] {
+            assert!(section.get(key).is_some(), "{key} is editable there: {section}");
+        }
     }
 
     #[test]
