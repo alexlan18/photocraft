@@ -613,6 +613,8 @@ fn wraps(id: &str) -> bool {
             | "file.export.artboardsToPdf"
             | "layer.new.artboard"
             | "file.export.colorLookupTables"
+            | "file.export.svg"
+            | "image.trace"
             | "view.newGuideLayout"
             | "type.warpText"
             | "type.pasteLoremIpsum"
@@ -1423,6 +1425,20 @@ fn front(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, params: &Value)
             let scope = if selected_adjustments { "selected" } else { "all" };
             dialog(app, json!({"path": format!("{dir}/{stem}.cube"), "size": 33, "title": stem, "scope": scope}), json!({"scope": ["all", "selected"]}))
         }
+        "file.export.svg" => {
+            let (_, _, name) = doc?;
+            let stem = name.rsplit_once('.').map_or(name.as_str(), |(a, _)| a).to_string();
+            dialog(
+                app,
+                json!({"path": format!("{dir}/{stem}.svg"), "colors": 16, "tolerance": 1.0, "despeckle": 8, "source": "document"}),
+                json!({"source": ["document", "layer"]}),
+            )
+        }
+        "image.trace" => dialog(
+            app,
+            json!({"colors": 16, "tolerance": 1.0, "despeckle": 8, "source": "document", "hideSource": false}),
+            json!({"source": ["document", "layer"]}),
+        ),
         "file.scripts.loadFilesIntoStack" => Some(Ok(json!({"dialog": crate::stack_dialog::open(app)}))),
         // Photography automation (photo_cmds / lens_cmds): a folder (or the open documents).
         "file.automate.photomerge" => dialog(

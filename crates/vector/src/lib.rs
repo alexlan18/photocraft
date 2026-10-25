@@ -13,6 +13,7 @@
 //! * [`stroke`]: polygon stroking with miter/round/bevel joins, butt/round/square caps, dashes.
 //! * [`shapes`]: live shapes (rectangles with corner radii, ellipses, polygons, stars, lines).
 //! * [`trace`]: contour tracing + curve fitting (selection → path).
+//! * [`image_trace`]: colour image → stacked flat-colour shapes (Image to SVG).
 //!
 //! Output is either raw coverage (`f32` per pixel) or sparse tiled [`Surface`]s in any
 //! [`PixelFormat`] (only tiles that differ from the default are allocated). Pure Rust, no
@@ -23,6 +24,7 @@
 pub mod edit;
 pub mod feather;
 pub mod flatten;
+pub mod image_trace;
 pub mod map;
 pub mod raster;
 pub mod shapes;

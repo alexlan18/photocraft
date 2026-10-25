@@ -506,13 +506,15 @@ fn main() -> eframe::Result {
                     log::warn!("couldn't remember GPU backend {}: {e}", b.name());
                 }
             });
-            // One control queue: the `--control` socket (if any) and the Agent panel's
-            // in-process MCP server both feed it; the frame loop answers.
+            // One control queue: the `--control` socket (if any), the Agent panel's in-process MCP
+            // server and the MCP server for other programs (Preferences) all feed it; the frame
+            // loop answers.
             let (control_tx, control_rx) = std::sync::mpsc::channel();
             app = app.with_control(control_rx);
             if let Some((port, token, _)) = control {
                 control_server::start(port, token, cc.egui_ctx.clone(), control_tx.clone());
             }
+            app.services.mcp_server = Some(agent_host::mcp_server(control_tx.clone(), cc.egui_ctx.clone()));
             app.services.agent_host = Some(agent_host::host(control_tx, cc.egui_ctx.clone()));
             #[cfg(target_os = "macos")]
             {

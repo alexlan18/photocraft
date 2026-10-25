@@ -1218,6 +1218,9 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             info.extend(gpu_memory_lines(app));
             f.insert("__gpuInfo".into(), json!(info));
             f.insert("__gpuAdapters".into(), json!(app.perf.gpu_info.adapters));
+            let mut mcp = crate::mcp_server_ui::describe(app);
+            mcp["config"] = json!(app.mcp_server.status.as_ref().map(crate::mcp_server_ui::client_config));
+            f.insert("__mcp".into(), mcp);
             let system = system_theme(app, ui.ctx());
             prefs_body(ui, f, system);
         }
@@ -1266,6 +1269,10 @@ fn humanize(key: &str) -> String {
         "agentBaseUrl" => return "Agent API endpoint".into(),
         "agentMaxTurns" => return "Agent tool rounds per message".into(),
         "agentRefusalFallbacks" => return "Agent refusal fallbacks".into(),
+        // The MCP server for other programs.
+        "mcpServer" => return "MCP server for other apps".into(),
+        "mcpPort" => return "MCP server port".into(),
+        "mcpToken" => return "MCP server token".into(),
         _ => {}
     }
     // These controls appear only for WebP, so reuse the existing translated labels.
@@ -1472,6 +1479,9 @@ fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>, system: Option<egui
                     if section == "performance" {
                         gpu_status_rows(ui, f.get("__gpuInfo"), f.get("__gpuAdapters"), obj);
                     }
+                    if section == "integrations" {
+                        mcp_status_rows(ui, f.get("__mcp"));
+                    }
                     ui.add_space(8.0);
                 }
                 if search.trim().is_empty()
@@ -1490,6 +1500,26 @@ fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>, system: Option<egui
     // A colour swatch was clicked: open the Color Picker on that value (#2144).
     if let Some((path, name)) = ctx_take_pick(ui) {
         crate::color_picker_ui::request_field(f, &format!("/values/{}", path.replace('.', "/")), &crate::color_picker_ui::title_for(&name));
+    }
+}
+
+/// Preferences › AI Integrations: whether the MCP server for other programs runs, where, and a
+/// button that copies the client configuration (URL and bearer token) to paste into a client.
+fn mcp_status_rows(ui: &mut egui::Ui, mcp: Option<&Value>) {
+    let t = Tokens::get(ui.ctx());
+    let Some(mcp) = mcp else { return };
+    ui.add_space(10.0);
+    if let Some(url) = mcp.get("url").and_then(Value::as_str) {
+        ui.label(RichText::new(crate::i18n::fmt(tl!("MCP server running at {url}"), &[("url", url)])).color(t.text_dim));
+        if let Some(config) = mcp.get("config").and_then(Value::as_str)
+            && crate::widgets::secondary_button(ui, tl!("Copy Client Config"), 150.0).on_hover_text(tl!("Copies the URL and token as an mcpServers entry for Claude Desktop, Claude Code or Cursor")).clicked()
+        {
+            ui.ctx().copy_text(config.to_string());
+        }
+    } else if let Some(e) = mcp.get("error").and_then(Value::as_str) {
+        ui.label(RichText::new(crate::i18n::fmt(tl!("MCP server not running: {error}"), &[("error", e)])).color(t.danger));
+    } else {
+        ui.label(RichText::new(tl!("Turn on the MCP server to let other programs use PhotoCraft's tools. Changes take effect after OK or Apply.")).color(t.text_faint));
     }
 }
 
@@ -1909,9 +1939,11 @@ fn field_rows(ui: &mut egui::Ui, section: &str, obj: &mut Map<String, Value>, ke
                     "integrations.agentModel" => photocraft_engine::agent::DEFAULT_MODEL,
                     "integrations.agentBaseUrl" => photocraft_engine::agent::DEFAULT_BASE_URL,
                     "integrations.agentApiKey" => photocraft_engine::agent::API_KEY_ENV,
+                    "integrations.mcpToken" => "generated when the server starts",
                     _ => "",
                 };
-                ui.add(egui::TextEdit::singleline(&mut s).desired_width(260.0).password(path == "integrations.agentApiKey").hint_text(hint));
+                let secret = matches!(path.as_str(), "integrations.agentApiKey" | "integrations.mcpToken");
+                ui.add(egui::TextEdit::singleline(&mut s).desired_width(260.0).password(secret).hint_text(tl!(hint)));
                 obj.insert(k, json!(s));
             }
             Value::Number(n) => {

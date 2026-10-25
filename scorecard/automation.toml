@@ -92,3 +92,9 @@ id = "AUTO-AGENT-1"
 target = "In-app agent: a collapsible Agent panel where the user edits the open document in words through the app's MCP tools"
 status = "done"
 note = "2026-10-25: Window › Agent (ui-egui/src/agent_ui.rs); automation/src/agent/ runs the Claude Messages API with the MCP tools (built-ins loaded, command tools behind tool search) over an in-process Backend::Local; Preferences › AI Integrations holds model, effort, key and endpoint; desktop only"
+
+[[item]]
+id = "AUTO-MCP-HTTP-1"
+target = "Other programs can use PhotoCraft's MCP tools over HTTP (Claude Desktop, Cursor, scripts), against the running app or a headless engine"
+status = "done"
+note = "2026-10-25: Streamable HTTP endpoint (automation/src/http.rs) with a bearer token, browser origins refused, loopback Host names only; Preferences › AI Integrations › MCP server for other apps (the live window, Copy Client Config) and photocraft-cli mcp --http"

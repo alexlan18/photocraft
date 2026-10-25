@@ -229,7 +229,9 @@ PhotoCraft's PSD support is a standalone crate written from Adobe's public speci
 
 Every menu item, tool and dialog runs a command from one registry of 500+ commands. The UI, the CLI, the JSON control channel and the MCP server all call the same commands, so anything you can click, a script or an AI agent can do too.
 
-Every command is also its own MCP tool (`filter_blur_gaussianBlur`, `layer_new_layer`, …), and the desktop app has a built-in agent: Window › Agent opens a collapsible panel where you describe an edit in words and watch the agent carry it out through those same tools, screenshots included. Set the model and API key in Edit › Preferences › AI Integrations (or export `ANTHROPIC_API_KEY`).
+Every command is also its own MCP tool (`filter_blur_gaussianBlur`, `layer_new_layer`, …), and the desktop app has a built-in agent: Window › Agent opens a collapsible panel where you describe an edit in words and watch the agent carry it out through those same tools, screenshots included. Set the model and API key in Edit › Preferences › AI Integrations (or export `ANTHROPIC_API_KEY`). Other programs can use the same tools too: turn on *MCP server for other apps* in that section and paste the copied client config into Claude Desktop, Claude Code, Cursor or any MCP client that speaks HTTP.
+
+File › Export › Image to SVG… traces a picture into flat-colour vector shapes (choose the number of colours and the smoothness) and writes an SVG; Image › Image Trace… puts the same shapes into the document as editable shape layers.
 
 ```sh
 # Headless: open, edit, save
@@ -246,6 +248,12 @@ photocraft-cli batch --help
 
 # Let an agent drive it over MCP (headless, or bridged to the running app)
 photocraft-cli mcp
+
+# ... or serve MCP over HTTP to any client (prints the URL and token)
+photocraft-cli mcp --http 8765
+
+# Trace a picture into an SVG
+photocraft-cli run logo.png --cmd file.export.svg --params '{"path":"logo.svg","colors":8}'
 ```
 
 The desktop app also offers an authenticated, loopback-only control channel (`photocraft --control`) for inspecting UI state, driving tools with pointer events, and taking offscreen screenshots. Every image in this README was rendered that way. See [`docs/control-protocol.md`](docs/control-protocol.md).

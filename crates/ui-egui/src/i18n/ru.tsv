@@ -4640,3 +4640,15 @@ shape	Appearance	Оформление
 	Agent API endpoint	Конечная точка API агента
 	Agent tool rounds per message	Раундов инструментов агента на сообщение
 	Agent refusal fallbacks	Запасные модели агента при отказе
+	Image to SVG…	Изображение в SVG…
+	Image Trace…	Трассировка изображения…
+	Hide Source	Скрыть источник
+	MCP server for other apps	MCP-сервер для других приложений
+	MCP server port	Порт MCP-сервера
+	MCP server token	Токен MCP-сервера
+	generated when the server starts	создаётся при запуске сервера
+	MCP server running at {url}	MCP-сервер работает по адресу {url}
+	Copy Client Config	Копировать настройки клиента
+	Copies the URL and token as an mcpServers entry for Claude Desktop, Claude Code or Cursor	Копирует URL и токен как запись mcpServers для Claude Desktop, Claude Code или Cursor
+	MCP server not running: {error}	MCP-сервер не запущен: {error}
+	Turn on the MCP server to let other programs use PhotoCraft's tools. Changes take effect after OK or Apply.	Включите MCP-сервер, чтобы другие программы могли пользоваться инструментами PhotoCraft. Изменения вступают в силу после «ОК» или «Применить».

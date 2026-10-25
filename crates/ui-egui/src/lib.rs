@@ -143,6 +143,7 @@ pub mod magnetic_lasso_ui;
 mod mask_props_ui;
 pub mod mask_thumbs_ui;
 pub mod mask_trash_prompt;
+pub mod mcp_server_ui;
 pub mod menu_catalog;
 pub mod menu_keys;
 pub mod menu_nav;
@@ -613,6 +614,9 @@ pub struct Services {
     /// Starts an Agent panel session (desktop: `photocraft-automation`'s runner over the app's
     /// own MCP server). `None` on the web, where the panel says so.
     pub agent_host: Option<photocraft_engine::agent::AgentHostFn>,
+    /// Starts and stops the MCP server for other programs (desktop: `photocraft-automation`'s
+    /// HTTP endpoint over the app's own tools). `None` on the web.
+    pub mcp_server: Option<photocraft_engine::agent::McpServerHostFn>,
     /// Files delivered asynchronously (web drag-and-drop): drained every frame and opened as
     /// documents.
     pub inbox: Option<Inbox>,
@@ -699,6 +703,8 @@ pub struct PhotocraftApp {
     pub services: Services,
     /// The Agent panel's live session and decoded images (`agent_ui`).
     pub agent: agent_ui::AgentRuntime,
+    /// The MCP server for other programs (`mcp_server_ui`).
+    pub mcp_server: mcp_server_ui::McpServerRuntime,
     /// Canvas caches per (document, display): CPU textures hold monitor values; the GPU
     /// canvas state is shared (`canvas::GPU_OUTPUT`).
     canvases: HashMap<(DocId, u32), canvas::CanvasCache>,
@@ -1046,6 +1052,7 @@ impl PhotocraftApp {
             committed_stroke: None,
             retouch_from_live: false,
             agent: agent_ui::AgentRuntime::default(),
+            mcp_server: mcp_server_ui::McpServerRuntime::default(),
             trail: None,
             remove_pending: Vec::new(),
             remove_pending_target: None,
@@ -2318,6 +2325,7 @@ impl eframe::App for PhotocraftApp {
         self.collect_screenshots(ctx);
         self.issue_screenshots(ctx);
         prefs_ui::tick(self, ctx);
+        mcp_server_ui::sync(self);
         updates_ui::tick(self, ctx);
         monitor_status::poll_frame(self, ctx, frame);
         // Control requests and persisted preferences can change the language in this frame.

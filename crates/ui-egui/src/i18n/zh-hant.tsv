@@ -3062,3 +3062,15 @@ curves	Smooth	平滑
 	Agent API endpoint	智慧代理 API 端點
 	Agent tool rounds per message	每則訊息的智慧代理工具回合數
 	Agent refusal fallbacks	智慧代理拒絕回退
+	Image to SVG…	影像轉 SVG…
+	Image Trace…	影像描圖…
+	Hide Source	隱藏來源圖層
+	MCP server for other apps	供其他應用程式使用的 MCP 伺服器
+	MCP server port	MCP 伺服器連接埠
+	MCP server token	MCP 伺服器權杖
+	generated when the server starts	伺服器啟動時產生
+	MCP server running at {url}	MCP 伺服器執行於 {url}
+	Copy Client Config	複製用戶端設定
+	Copies the URL and token as an mcpServers entry for Claude Desktop, Claude Code or Cursor	將 URL 和權杖複製為 mcpServers 項目，用於 Claude Desktop、Claude Code 或 Cursor
+	MCP server not running: {error}	MCP 伺服器未執行：{error}
+	Turn on the MCP server to let other programs use PhotoCraft's tools. Changes take effect after OK or Apply.	開啟 MCP 伺服器，讓其他程式使用 PhotoCraft 的工具。變更會在按下「確定」或「套用」後生效。

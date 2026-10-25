@@ -19,7 +19,7 @@ photocraft-engine = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-rmcp = { version = "3.5", default-features = false, features = ["client", "server", "macros", "transport-io"] }
+rmcp = { version = "3.5", default-features = false, features = ["client", "server", "macros", "transport-io", "transport-streamable-http-server"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-std", "sync", "net", "io-util", "time"] }
 base64 = "0.22"
 schemars = "1"
@@ -29,6 +29,12 @@ clap = { workspace = true }
 # The Agent panel's Claude Messages API calls: HTTPS with Rust TLS and the platform's roots, no
 # async runtime (the same pinning as the desktop app's update check).
 ureq = { version = "3.4", default-features = false, features = ["rustls", "platform-verifier"] }
+# MCP over Streamable HTTP for other programs (`mcp --http`, the app's MCP server preference):
+# rmcp's HTTP service behind a plain HTTP/1 listener.
+hyper = { version = "1", default-features = false, features = ["server", "http1"] }
+hyper-util = { version = "0.1", default-features = false, features = ["tokio"] }
+http-body-util = "0.1"
+bytes = "1"
 
 [dev-dependencies]
 # Synthetic camera raws (#7789).

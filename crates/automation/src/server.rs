@@ -239,6 +239,30 @@ pub struct SaveParams {
 
 #[derive(Debug, Default, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+pub struct SvgParams {
+    /// Where to write the `.svg` (beneath the automation write root in headless mode). Omit to
+    /// get the SVG text back as `svg`.
+    #[serde(default)]
+    pub path: Option<String>,
+    /// Palette size, 2..64 (default 16). Fewer colours give a flatter, simpler drawing.
+    #[serde(default)]
+    pub colors: Option<u32>,
+    /// Curve-fitting tolerance in pixels, 0.1..10 (default 1). Larger is smoother with fewer points.
+    #[serde(default)]
+    pub tolerance: Option<f64>,
+    /// Regions under this many pixels merge into their neighbours, 0..10000 (default 8).
+    #[serde(default)]
+    pub despeckle: Option<u32>,
+    /// `document` (the visible composite, default) or `layer` (the active layer's own pixels).
+    #[serde(default)]
+    pub source: Option<String>,
+    /// The SVG's `<title>` (default: the document name).
+    #[serde(default)]
+    pub title: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct PreviewParams {
     /// Headless mode only: document index (default: the active document).
     /// Bridge previews capture the app window and reject `index`.
@@ -392,8 +416,8 @@ pub struct UiSetParams {
     /// "mode"), kinds (a list of layer kinds), name (matches part of the layer name) and mode (a
     /// blend mode name) for the Layers panel filter). strokeTrace (true, false, "stderr" or "off":
     /// the stroke latency trace at runtime; a CSV file is set at launch with --stroke-trace, not
-    /// over this channel). updatesOpen (bool, the Help › Check for Updates window). Other fields
-    /// are an error.
+    /// over this channel). updatesOpen (bool, the Help › Check for Updates window). agentPanel
+    /// (bool, the Agent panel on the right; the same as Window › Agent). Other fields are an error.
     pub fields: Value,
 }
 
@@ -854,6 +878,54 @@ impl PhotocraftMcp {
             return Ok(fail("doc_export needs `path`"));
         }
         self.save_impl(p).await
+    }
+
+    #[tool(description = "Convert the active document's image to SVG vector art (Image Trace): the picture is reduced to \
+        `colors` flat colours and each becomes a filled Bezier path. Returns {width, height, paths, bytes} and either `path` \
+        (written there) or `svg` (the text). The document is unchanged; to get editable shape layers instead, call `image_trace`.")]
+    async fn image_to_svg(&self, Parameters(p): Parameters<SvgParams>) -> Result<CallToolResult, McpError> {
+        let mut params = serde_json::Map::new();
+        if let Some(v) = p.colors {
+            params.insert("colors".into(), json!(v));
+        }
+        if let Some(v) = p.tolerance {
+            params.insert("tolerance".into(), json!(v));
+        }
+        if let Some(v) = p.despeckle {
+            params.insert("despeckle".into(), json!(v));
+        }
+        if let Some(v) = p.source {
+            params.insert("source".into(), json!(v));
+        }
+        if let Some(v) = p.title {
+            params.insert("title".into(), json!(v));
+        }
+        let path = p.path.filter(|s| !s.trim().is_empty());
+        // Headless: trace to text, then write it through the session's write authority (the
+        // workspace's write root), like `doc_save`.
+        let (params2, path2) = (Value::Object(params.clone()), path.clone());
+        let headless = self
+            .headless_op(move |h| {
+                let mut out = h.command_run("file.export.svg", params2)?;
+                if let Some(path) = path2 {
+                    let svg = out.get("svg").and_then(Value::as_str).unwrap_or_default().to_string();
+                    h.write_render(std::path::Path::new(&path), svg.as_bytes())?;
+                    if let Some(o) = out.as_object_mut() {
+                        o.remove("svg");
+                        o.insert("path".into(), json!(path));
+                    }
+                }
+                Ok(out)
+            })
+            .await;
+        if let Some(r) = headless {
+            return to_result(r);
+        }
+        // The app writes the file itself, under its own file policy.
+        if let Some(path) = path {
+            params.insert("path".into(), json!(path));
+        }
+        self.run_command("file.export.svg".into(), Value::Object(params), true).await
     }
 
     #[tool(description = "Document state as JSON: layer tree (top to bottom), history, selection, active layer.")]

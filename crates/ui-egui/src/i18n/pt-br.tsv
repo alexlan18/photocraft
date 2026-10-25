@@ -4367,3 +4367,15 @@ layerLabel	No Color	Sem cor
 	Agent API endpoint	Endpoint de API do agente
 	Agent tool rounds per message	Rodadas de ferramentas do agente por mensagem
 	Agent refusal fallbacks	Modelos alternativos do agente em caso de recusa
+	Image to SVG…	Imagem para SVG…
+	Image Trace…	Rastreamento de imagem…
+	Hide Source	Ocultar origem
+	MCP server for other apps	Servidor MCP para outros apps
+	MCP server port	Porta do servidor MCP
+	MCP server token	Token do servidor MCP
+	generated when the server starts	gerado quando o servidor inicia
+	MCP server running at {url}	Servidor MCP em execução em {url}
+	Copy Client Config	Copiar configuração do cliente
+	Copies the URL and token as an mcpServers entry for Claude Desktop, Claude Code or Cursor	Copia a URL e o token como uma entrada mcpServers para Claude Desktop, Claude Code ou Cursor
+	MCP server not running: {error}	Servidor MCP parado: {error}
+	Turn on the MCP server to let other programs use PhotoCraft's tools. Changes take effect after OK or Apply.	Ative o servidor MCP para que outros programas usem as ferramentas do PhotoCraft. As alterações valem após OK ou Aplicar.

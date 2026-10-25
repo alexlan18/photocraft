@@ -950,6 +950,13 @@ pub struct Integrations {
     pub agent_max_turns: u32,
     /// Let the API answer with another model when the chosen one declines a request.
     pub agent_refusal_fallbacks: bool,
+    /// Serve the app's MCP tools to other programs (Claude Desktop, Cursor, scripts) over HTTP on
+    /// this computer, at `http://127.0.0.1:<mcpPort>/mcp`.
+    pub mcp_server: bool,
+    /// The MCP server's port ([`crate::agent::DEFAULT_MCP_PORT`] by default).
+    pub mcp_port: u32,
+    /// The bearer token MCP clients send; empty = generated when the server starts, then kept here.
+    pub mcp_token: String,
 }
 
 impl Default for Integrations {
@@ -963,6 +970,9 @@ impl Default for Integrations {
             agent_base_url: String::new(),
             agent_max_turns: crate::agent::DEFAULT_MAX_TURNS,
             agent_refusal_fallbacks: true,
+            mcp_server: false,
+            mcp_port: u32::from(crate::agent::DEFAULT_MCP_PORT),
+            mcp_token: String::new(),
         }
     }
 }
@@ -1247,6 +1257,7 @@ pub fn range(path: &str) -> Option<(f64, f64)> {
         "type.recentFonts" => (0.0, 50.0),
         "integrations.controlPort" => (0.0, 65535.0),
         "integrations.agentMaxTurns" => (1.0, 1000.0),
+        "integrations.mcpPort" => (1.0, 65535.0),
         _ => return None,
     })
 }

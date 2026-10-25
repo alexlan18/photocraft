@@ -70,6 +70,7 @@ pub mod raw;
 pub mod slices_map;
 pub mod smart_map;
 pub mod svg;
+pub mod svg_write;
 mod text_import;
 pub mod text_styles_map;
 pub mod tiff_layers;

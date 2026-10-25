@@ -159,6 +159,42 @@ pub struct AgentHandle {
 /// none). Returns the error to show in the panel when the session can't start.
 pub type AgentHostFn = Box<dyn FnMut(AgentSettings) -> Result<AgentHandle, String>>;
 
+/// The port the MCP server for other programs listens on unless Preferences name another.
+pub const DEFAULT_MCP_PORT: u16 = 8765;
+
+/// The MCP server for other programs (Preferences › AI Integrations › MCP Server): the app's
+/// tools at `http://127.0.0.1:<port>/mcp`, behind a bearer token.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct McpServerSettings {
+    pub port: u16,
+    /// Empty: the host generates one, and the shell stores it in Preferences.
+    pub token: String,
+}
+
+impl McpServerSettings {
+    /// The server Preferences ask for, or `None` when it is off.
+    pub fn from_prefs(prefs: &Preferences) -> Option<Self> {
+        let p = &prefs.integrations;
+        p.mcp_server.then(|| Self {
+            port: u16::try_from(p.mcp_port).ok().filter(|&port| port > 0).unwrap_or(DEFAULT_MCP_PORT),
+            token: p.mcp_token.trim().to_string(),
+        })
+    }
+}
+
+/// A running MCP server, as the host reports it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct McpServerStatus {
+    /// The endpoint (`http://127.0.0.1:8765/mcp`).
+    pub url: String,
+    /// The bearer token clients send (the one asked for, or the one generated).
+    pub token: String,
+}
+
+/// Starts the MCP server with these settings, replacing a running one, or stops it (`None`).
+/// The desktop app wires one; the web build has none.
+pub type McpServerHostFn = Box<dyn FnMut(Option<McpServerSettings>) -> Result<Option<McpServerStatus>, String>>;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -191,6 +227,15 @@ mod tests {
         assert!(s.check().unwrap_err().contains("whitespace"));
         s.api_key = String::new();
         assert!(s.check().unwrap_err().contains(API_KEY_ENV));
+    }
+
+    #[test]
+    fn the_mcp_server_is_off_until_preferences_turn_it_on() {
+        assert_eq!(McpServerSettings::from_prefs(&Preferences::default()), None);
+        let with = |port: u32| Preferences { integrations: Integrations { mcp_server: true, mcp_port: port, mcp_token: " t ".into(), ..Default::default() }, ..Default::default() };
+        assert_eq!(McpServerSettings::from_prefs(&with(9000)), Some(McpServerSettings { port: 9000, token: "t".into() }));
+        assert_eq!(McpServerSettings::from_prefs(&with(0)).map(|s| s.port), Some(DEFAULT_MCP_PORT));
+        assert_eq!(McpServerSettings::from_prefs(&with(70_000)).map(|s| s.port), Some(DEFAULT_MCP_PORT));
     }
 
     #[test]

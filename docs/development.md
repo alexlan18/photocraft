@@ -344,6 +344,35 @@ File opens and saves through the agent obey the automation roots given at launch
 variables); without them the agent asks the user to use the File menu. The web build has no agent
 (no HTTPS client or threads): the panel says so.
 
+### MCP server for other programs
+
+The same tools are offered to other MCP clients over Streamable HTTP
+(`crates/automation/src/http.rs`: rmcp's HTTP service behind a hyper HTTP/1 listener with a bearer
+token, browser origins refused, loopback `Host` names only). In the app: Preferences › AI
+Integrations › *MCP server for other apps* starts it on `http://127.0.0.1:8765/mcp`
+(`mcp_server_ui.rs` restarts it when the port or token changes; **Copy Client Config** copies an
+`mcpServers` entry). Headless: `photocraft-cli mcp --http 8765` (add `--bridge` to drive a running
+`photocraft --control`). Quick check with curl:
+
+```sh
+photocraft-cli mcp --http 8765 --http-token-file /tmp/mcp.token &
+curl -s http://127.0.0.1:8765/mcp -H "Authorization: Bearer $(cat /tmp/mcp.token)" \
+  -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"1"}}}'
+```
+
+### Image Trace (Image to SVG)
+
+`photocraft_vector::image_trace` turns a picture into flat-colour Bézier shapes: a median-cut
+palette refined by k-means on ≤120k sampled pixels, nearest-colour labels (rayon), despeckle by
+four-connected region size, then one mask per colour in area order, each covering its colour and
+every colour stacked above it (no hairline gaps between shapes), traced with `trace::trace_mask`.
+`photocraft_io::svg_write` writes the SVG (one even-odd `<path>` per colour). Commands:
+`file.export.svg` (File › Export › Image to SVG…, writes `path` or returns the text) and
+`image.trace` (Image › Image Trace…, a group of shape layers), both background jobs; MCP tool
+`image_to_svg`. Limit: 36 MP; colours are written as the composite's RGB values (exact for sRGB
+documents).
+
 Driving it from tests or the control channel: `ui.set {agentPanel: true}` and `ui.inspect` → `agent`
 (the transcript included). The runner is tested with scripted model replies against the headless
 backend (`agent/runner.rs` tests); the live API is never contacted by tests.

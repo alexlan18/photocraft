@@ -4116,3 +4116,15 @@ curves	Smooth	スムーズ
 	Agent API endpoint	エージェントの API エンドポイント
 	Agent tool rounds per message	1 メッセージあたりのツール実行ラウンド数
 	Agent refusal fallbacks	エージェントの拒否時フォールバック
+	Image to SVG…	画像を SVG に…
+	Image Trace…	画像トレース…
+	Hide Source	ソースを隠す
+	MCP server for other apps	他のアプリ用 MCP サーバー
+	MCP server port	MCP サーバーのポート
+	MCP server token	MCP サーバーのトークン
+	generated when the server starts	サーバーの起動時に生成
+	MCP server running at {url}	MCP サーバーは {url} で実行中
+	Copy Client Config	クライアント設定をコピー
+	Copies the URL and token as an mcpServers entry for Claude Desktop, Claude Code or Cursor	URL とトークンを Claude Desktop、Claude Code、Cursor 用の mcpServers エントリとしてコピーします
+	MCP server not running: {error}	MCP サーバーは実行されていません：{error}
+	Turn on the MCP server to let other programs use PhotoCraft's tools. Changes take effect after OK or Apply.	MCP サーバーをオンにすると、他のプログラムから PhotoCraft のツールを使えます。変更は「OK」または「適用」の後に反映されます。

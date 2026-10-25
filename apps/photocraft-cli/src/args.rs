@@ -14,7 +14,7 @@ use std::path::PathBuf;
 use clap::error::ErrorKind;
 use clap::parser::ValueSource;
 use clap::{ArgAction, ArgGroup, ArgMatches, Args, CommandFactory, FromArgMatches, Parser, Subcommand};
-use photocraft_automation::args::{AutomationArgs, ControlArgs, blank_env_is_unset, conflict, control_port, name_env_vars};
+use photocraft_automation::args::{AutomationArgs, ControlArgs, McpHttpArgs, blank_env_is_unset, conflict, control_port, name_env_vars};
 use photocraft_codecs::{JpegFormat, TiffCompression};
 use photocraft_io::{DdsCompression, DpxBits, TgaBits};
 use serde_json::Value;
@@ -203,6 +203,9 @@ pub(crate) struct CommandsArgs {
 /// Headless: each automation root grants that direction of file access; an omitted root denies it.
 /// Prefer absolute root paths in MCP client configurations. Bridge: set the roots on the desktop
 /// app; root flags are refused. The token flags require --bridge (or PHOTOCRAFT_CONTROL_PORT).
+///
+/// With --http the same tools are served over Streamable HTTP for other programs (any MCP client
+/// that speaks HTTP), at http://127.0.0.1:<PORT>/mcp with `Authorization: Bearer <token>`.
 #[derive(Args)]
 pub(crate) struct McpArgs {
     /// Bridge to the PhotoCraft app listening here instead of a headless engine; a bare port means
@@ -216,6 +219,8 @@ pub(crate) struct McpArgs {
     pub(crate) control: ControlArgs,
     #[command(flatten)]
     pub(crate) automation: AutomationArgs,
+    #[command(flatten)]
+    pub(crate) http: McpHttpArgs,
 }
 
 /// Keep one headless session open and answer JSON lines on stdio, or on 127.0.0.1:<PORT>
@@ -399,6 +404,14 @@ pub(crate) fn parse(args: &[OsString]) -> Result<Cli, clap::Error> {
                     return Err(ServerOptionError::BridgeRoots.into_clap(sub));
                 }
                 check_server(sub, m, a.bridge.is_some(), "--bridge")?;
+                for (id, flag) in [("http_token", "--http-token"), ("http_token_file", "--http-token-file")] {
+                    if m.value_source(id) == Some(ValueSource::CommandLine) && a.http.http.is_none() {
+                        return Err(ServerOptionError::NeedsTransport { flag, transport: "--http" }.into_clap(sub));
+                    }
+                }
+                if a.http.http.is_some() {
+                    conflict(sub, m, "http_token", "http_token_file")?;
+                }
             }
         }
         (Command::Serve(a), Some((name, m))) => {

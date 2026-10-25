@@ -378,6 +378,48 @@ error and note rows). File tools in the panel are subject to the same automation
 socket. `crates/automation/src/agent/`, `crates/ui-egui/src/agent_ui.rs`,
 `apps/photocraft/src/agent_host.rs`.
 
+**MCP over HTTP for other programs.** The same tools are served over MCP's Streamable HTTP
+transport, so any MCP client that speaks HTTP (Claude Desktop, Claude Code, Cursor, VS Code, an
+SDK script) can use PhotoCraft without spawning a process:
+
+- **The running app:** Edit › Preferences › AI Integrations › *MCP server for other apps* (pref
+  `integrations.mcpServer`, port `integrations.mcpPort`, default 8765). The server listens on
+  `http://127.0.0.1:<port>/mcp` and drives the open window through the local backend, exactly
+  like the Agent panel (screenshots and `ui_*` tools included). The bearer token is
+  `integrations.mcpToken`; left empty, one is generated when the server starts and kept there.
+  The section shows the URL and a **Copy Client Config** button that copies an `mcpServers`
+  entry with the URL and token. `ui.inspect` reports `mcpServer` (`running`, `url`, `error`).
+- **Headless or bridged:** `photocraft-cli mcp --http <PORT|ADDR>` serves a headless engine (with
+  the automation roots as usual), or with `--bridge` the running app over its control socket.
+  The token comes from `--http-token`, `--http-token-file` (created when missing),
+  `PHOTOCRAFT_MCP_TOKEN` or `PHOTOCRAFT_MCP_TOKEN_FILE`; without any, one is generated and
+  printed on standard error.
+
+Every request needs `Authorization: Bearer <token>` (401 otherwise, compared in constant time).
+Requests carrying a browser `Origin` header are refused (403), and on a loopback address only
+loopback `Host` names are accepted, which stops DNS rebinding. Paths other than `/mcp` are 404.
+Connections are capped at 16. Binding a non-loopback address (`--http 0.0.0.0:8765`) prints a
+warning: the traffic is plain HTTP and the token is the only protection. A client entry:
+
+```json
+{"mcpServers": {"photocraft": {"type": "http", "url": "http://127.0.0.1:8765/mcp",
+  "headers": {"Authorization": "Bearer <token>"}}}}
+```
+
+Like the `--control` socket, the app's server runs commands with the desktop's file access
+unless automation roots were given at launch; turn it on only while you use it.
+`crates/automation/src/http.rs`, `crates/ui-egui/src/mcp_server_ui.rs`.
+
+**Image to SVG.** `image_to_svg {path?, colors?, tolerance?, despeckle?, source?, title?}`
+traces the active document into flat-colour Bézier shapes (`photocraft_vector::image_trace`:
+median-cut palette refined by k-means, despeckle, area-ordered stacked masks, Schneider curve
+fitting) and returns `svg` text, or writes `path` (headless: beneath the write root; bridge and
+local: the app writes it). The engine commands behind it are `file.export.svg` (File › Export ›
+Image to SVG…) and `image.trace` (Image › Image Trace…, a group of editable shape layers, one per
+colour, as one undo step); both run as cancellable background jobs. Automation may run
+`file.export.svg` without `path` (it returns the text); with a `path` it is an ambient-path
+command, so use `image_to_svg`.
+
 **Security note:** TCP control uses a bearer token, not client identity or general per-method
 authorization. A client that possesses the token receives the non-filesystem control surface,
 including UI input, command execution, and application control. Keep token files private, do not

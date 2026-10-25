@@ -77,6 +77,29 @@ pub(crate) fn mcp(a: &McpArgs, err: &mut dyn Write) -> Result {
         }
         None => PhotocraftMcp::headless_with_workspace(a.automation.workspace()?),
     };
+    if let Some(addr) = a.http.http {
+        return mcp_http(server, addr, &a.http, err);
+    }
     let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
     Ok(rt.block_on(server.serve_stdio())?)
+}
+
+/// `mcp --http`: serve until the process is stopped (Ctrl+C).
+fn mcp_http(server: PhotocraftMcp, addr: SocketAddr, h: &photocraft_automation::args::McpHttpArgs, err: &mut dyn Write) -> Result {
+    let (supplied, token_file) = (h.http_token.as_deref(), h.http_token_file.as_deref());
+    let token = security::server_token(supplied, token_file)?;
+    let http = photocraft_automation::http::HttpServer::start(server, addr, token.clone())?;
+    let _ = writeln!(err, "photocraft-cli MCP endpoint: {}", http.url());
+    if let Some(path) = token_file {
+        let _ = writeln!(err, "photocraft-cli MCP token file: {}", path.display());
+    } else if supplied.is_none() {
+        let _ = writeln!(err, "photocraft-cli MCP token: {token}");
+    }
+    if !addr.ip().is_loopback() {
+        let _ = writeln!(err, "photocraft-cli: warning: {addr} is reachable from other machines over plain HTTP; the token is the only protection");
+    }
+    let _ = writeln!(err, "photocraft-cli: clients send `Authorization: Bearer <token>`; stop with Ctrl+C");
+    loop {
+        std::thread::park();
+    }
 }

@@ -4399,3 +4399,15 @@ navigator	Zoom	Zoom
 	Agent API endpoint	Punto de conexión de API del agente
 	Agent tool rounds per message	Rondas de herramientas del agente por mensaje
 	Agent refusal fallbacks	Modelos alternativos del agente ante rechazos
+	Image to SVG…	Imagen a SVG…
+	Image Trace…	Calco de imagen…
+	Hide Source	Ocultar origen
+	MCP server for other apps	Servidor MCP para otras aplicaciones
+	MCP server port	Puerto del servidor MCP
+	MCP server token	Token del servidor MCP
+	generated when the server starts	se genera al iniciar el servidor
+	MCP server running at {url}	Servidor MCP en ejecución en {url}
+	Copy Client Config	Copiar configuración del cliente
+	Copies the URL and token as an mcpServers entry for Claude Desktop, Claude Code or Cursor	Copia la URL y el token como una entrada mcpServers para Claude Desktop, Claude Code o Cursor
+	MCP server not running: {error}	El servidor MCP no se está ejecutando: {error}
+	Turn on the MCP server to let other programs use PhotoCraft's tools. Changes take effect after OK or Apply.	Active el servidor MCP para que otros programas puedan usar las herramientas de PhotoCraft. Los cambios se aplican tras Aceptar o Aplicar.

@@ -8,6 +8,7 @@
 //! doesn't stop a launch that needs none.
 
 use std::ffi::OsString;
+use std::net::{Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 
 use clap::builder::NonEmptyStringValueParser;
@@ -54,6 +55,39 @@ impl AutomationArgs {
 pub fn control_port(s: &str) -> Result<u16, NotAPort> {
     s.trim().parse().map_err(|_| NotAPort)
 }
+
+/// The MCP-over-HTTP endpoint for other programs (`photocraft-cli mcp --http`, the desktop app's
+/// `--mcp-http`) and its bearer token.
+#[derive(Args)]
+pub struct McpHttpArgs {
+    /// Serve MCP over Streamable HTTP at http://<ADDR>/mcp, for other programs; a bare port means
+    /// 127.0.0.1:<PORT>
+    #[arg(long = "http", value_name = "PORT|ADDR", value_parser = http_addr)]
+    pub http: Option<SocketAddr>,
+    /// The HTTP endpoint's bearer token (64 hex digits; generated and printed when absent)
+    #[arg(long, value_name = "64-HEX", env = "PHOTOCRAFT_MCP_TOKEN", hide_env_values = true, value_parser = NonEmptyStringValueParser::new())]
+    pub http_token: Option<String>,
+    /// A file holding the HTTP bearer token, used instead of --http-token (created when missing)
+    #[arg(long, value_name = "PATH", env = "PHOTOCRAFT_MCP_TOKEN_FILE")]
+    pub http_token_file: Option<PathBuf>,
+}
+
+/// `--http`: a port (on 127.0.0.1), `localhost:<PORT>`, or an IP address and port.
+pub fn http_addr(s: &str) -> Result<SocketAddr, NotAnAddress> {
+    let s = s.trim();
+    if let Ok(port) = control_port(s) {
+        return Ok(SocketAddr::from((Ipv4Addr::LOCALHOST, port)));
+    }
+    if let Some(port) = s.strip_prefix("localhost:") {
+        return control_port(port).map(|port| SocketAddr::from((Ipv4Addr::LOCALHOST, port))).map_err(|_| NotAnAddress);
+    }
+    s.parse().map_err(|_| NotAnAddress)
+}
+
+/// An [`http_addr`] value that isn't an address.
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+#[error("expected a port, or an IP address and port such as 127.0.0.1:8765")]
+pub struct NotAnAddress;
 
 /// A [`control_port`] value that isn't a port.
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
@@ -112,6 +146,17 @@ mod tests {
         assert_eq!(control_port("50494"), Ok(50494));
         assert_eq!(control_port(" 8080 "), Ok(8080));
         assert_eq!(control_port("0"), Ok(0));
+    }
+
+    #[test]
+    fn http_addr_takes_a_port_or_an_address() {
+        assert_eq!(http_addr("8765"), Ok(SocketAddr::from(([127, 0, 0, 1], 8765))));
+        assert_eq!(http_addr("localhost:9"), Ok(SocketAddr::from(([127, 0, 0, 1], 9))));
+        assert_eq!(http_addr("0.0.0.0:80"), Ok(SocketAddr::from(([0, 0, 0, 0], 80))));
+        assert_eq!(http_addr("[::1]:7"), Ok("[::1]:7".parse().unwrap()));
+        for bad in ["", "x", "localhost", "example.com:80", "1.2.3.4"] {
+            assert_eq!(http_addr(bad), Err(NotAnAddress), "{bad:?}");
+        }
     }
 
     #[test]

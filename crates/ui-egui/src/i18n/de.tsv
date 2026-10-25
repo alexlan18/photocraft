@@ -3450,3 +3450,15 @@ curves	Smooth	Glätten
 	Agent API endpoint	Agent-API-Endpunkt
 	Agent tool rounds per message	Agent-Werkzeugrunden pro Nachricht
 	Agent refusal fallbacks	Agent-Ausweichmodelle bei Ablehnung
+	Image to SVG…	Bild in SVG…
+	Image Trace…	Bildnachzeichner…
+	Hide Source	Quelle ausblenden
+	MCP server for other apps	MCP-Server für andere Apps
+	MCP server port	MCP-Server-Port
+	MCP server token	MCP-Server-Token
+	generated when the server starts	wird beim Start des Servers erzeugt
+	MCP server running at {url}	MCP-Server läuft unter {url}
+	Copy Client Config	Client-Konfiguration kopieren
+	Copies the URL and token as an mcpServers entry for Claude Desktop, Claude Code or Cursor	Kopiert URL und Token als mcpServers-Eintrag für Claude Desktop, Claude Code oder Cursor
+	MCP server not running: {error}	MCP-Server läuft nicht: {error}
+	Turn on the MCP server to let other programs use PhotoCraft's tools. Changes take effect after OK or Apply.	Schalten Sie den MCP-Server ein, damit andere Programme die Werkzeuge von PhotoCraft nutzen können. Änderungen gelten nach OK oder Anwenden.

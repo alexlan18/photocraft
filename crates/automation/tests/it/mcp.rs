@@ -1368,7 +1368,13 @@ async fn convention_tools_have_titles_hints_and_strict_schemas() {
         for hint in ["readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint"] {
             assert!(value["annotations"][hint].is_boolean(), "{value}");
         }
-        assert_eq!(value["inputSchema"]["additionalProperties"], false, "{value}");
+        // A per-command tool with parameters takes the engine command's own, documented in its
+        // description (the command validates them); the built-in tools are strict.
+        if PhotocraftMcp::headless().is_command_tool(&tool.name) {
+            assert!(value["inputSchema"]["additionalProperties"].is_boolean(), "{value}");
+        } else {
+            assert_eq!(value["inputSchema"]["additionalProperties"], false, "{value}");
+        }
     }
     client.cancel().await.unwrap();
 }

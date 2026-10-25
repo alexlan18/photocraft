@@ -22,6 +22,7 @@ pub mod bridge;
 pub mod budgets;
 pub mod files;
 pub mod headless;
+pub mod http;
 pub mod rpc;
 pub mod security;
 pub mod server;

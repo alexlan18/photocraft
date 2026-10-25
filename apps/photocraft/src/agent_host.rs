@@ -3,12 +3,14 @@
 //! path the `--control` socket uses, without a socket). The runner thread queues a request,
 //! the frame loop answers it, the runner carries on; the UI thread never waits on the agent.
 
+use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use std::sync::mpsc::Sender;
 use std::time::{Duration, Instant};
 
-use photocraft_automation::{AutomationError, LocalControl, PhotocraftMcp};
-use photocraft_engine::agent::{AgentHandle, AgentSettings};
+use photocraft_automation::http::HttpServer;
+use photocraft_automation::{AutomationError, LocalControl, PhotocraftMcp, security};
+use photocraft_engine::agent::{AgentHandle, AgentSettings, McpServerHostFn, McpServerSettings, McpServerStatus};
 use photocraft_ui_egui::control::{ControlRequest, REPLY_DEADLINE};
 use serde_json::{Value, json};
 
@@ -64,6 +66,26 @@ pub fn host(tx: Sender<ControlRequest>, ctx: egui::Context) -> photocraft_engine
     })
 }
 
+/// The host for `Services::mcp_server`: the same tools as the Agent panel, served to other
+/// programs over HTTP on 127.0.0.1 (Preferences › AI Integrations › MCP server). Each call
+/// stops the running server, then starts one with the new settings (or none).
+pub fn mcp_server(tx: Sender<ControlRequest>, ctx: egui::Context) -> McpServerHostFn {
+    let mut running: Option<HttpServer> = None;
+    Box::new(move |settings: Option<McpServerSettings>| -> Result<Option<McpServerStatus>, String> {
+        if let Some(server) = running.take() {
+            server.stop();
+        }
+        let Some(settings) = settings else { return Ok(None) };
+        let token = if settings.token.is_empty() { security::generate_token().map_err(|e| e.to_string())? } else { settings.token.to_ascii_lowercase() };
+        security::validate_token(&token).map_err(|_| "the MCP server token must be 64 hexadecimal digits (clear it to generate one)".to_string())?;
+        let control: Arc<dyn LocalControl> = Arc::new(UiControl::new(tx.clone(), ctx.clone()));
+        let server = HttpServer::start(PhotocraftMcp::local(control), SocketAddr::from((Ipv4Addr::LOCALHOST, settings.port)), token.clone()).map_err(|e| e.to_string())?;
+        let url = server.url();
+        running = Some(server);
+        Ok(Some(McpServerStatus { url, token }))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -84,6 +106,21 @@ mod tests {
         let c = UiControl::new(tx, egui::Context::default());
         let e = c.call("ui.inspect", json!({})).unwrap_err();
         assert!(e.to_string().contains("shutting down"), "{e}");
+    }
+
+    #[test]
+    fn the_mcp_server_starts_restarts_and_stops() {
+        let (tx, _rx) = std::sync::mpsc::channel::<ControlRequest>();
+        let mut host = mcp_server(tx, egui::Context::default());
+        // Port 0 is not a preference value, but lets the test pick a free port.
+        let started = host(Some(McpServerSettings { port: 0, token: String::new() })).unwrap().unwrap();
+        assert!(started.url.starts_with("http://127.0.0.1:") && started.url.ends_with("/mcp"), "{}", started.url);
+        assert!(security::validate_token(&started.token).is_ok());
+        let again = host(Some(McpServerSettings { port: 0, token: started.token.clone() })).unwrap().unwrap();
+        assert_eq!(again.token, started.token);
+        let e = host(Some(McpServerSettings { port: 0, token: "nope".into() })).unwrap_err();
+        assert!(e.contains("64 hexadecimal"), "{e}");
+        assert_eq!(host(None).unwrap(), None);
     }
 
     #[test]
