@@ -87,6 +87,24 @@ at the `craft-fonts-ref` commit in `.github/workflows/release.yml` and builds wi
 `Contents/Resources/Licenses` in the macOS app). Bump the pin deliberately, together with the one
 in `ci.yml`. Rules: `../craftrules/standards/fonts.md`; build option: `docs/development.md` › Fonts.
 
+### One entry point: `shell/build.ps1`
+
+`pwsh shell/build.ps1` (PowerShell 7+, on Windows, macOS, Linux or FreeBSD) builds the release
+packages for the machine it runs on by calling that platform's script below, so a local build
+needs only one command. `-Target web` builds the site zip on any of them. Packaging for another
+OS is refused with a message: each platform is built on its own runner, as in CI.
+
+`-Portable` needs nothing but cargo. It builds `photocraft` and `photocraft-cli` in release
+(static C runtime on Windows) and archives them with the licences, the craft-fonts licences when
+`CRAFT_FONTS_DIR` is set, and `portable.txt`, as
+`photocraft-<v>-<os>-<arch>-portable.zip` on Windows or `.tar.gz` elsewhere. It is unsigned,
+for testing and for machines without WiX, Xcode or nfpm.
+
+Other options: `-Arch` (Windows `x64|x86|arm64`, macOS `universal|aarch64|x86_64`, portable any
+Rust architecture), `-SkipBuild`, `-Check` (layers, clippy and the app crates' tests first),
+`-FontsDir <craft-fonts checkout>` and `-Formats` for Linux. Output goes to `$DIST`
+(default `dist/release`). `Get-Help ./shell/build.ps1 -Full` lists everything.
+
 ### macOS
 
 `packaging/macos/package.sh` builds `aarch64-apple-darwin` and `x86_64-apple-darwin` with
