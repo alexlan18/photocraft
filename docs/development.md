@@ -333,8 +333,21 @@ HTTPS with the built-in tools loaded and the ~940 per-command tools deferred beh
 search, keeps the conversation append-only (prompt caching on the system prompt and the tools), and
 reports events the panel draws (`crates/ui-egui/src/agent_ui.rs`).
 
-Setup: Edit › Preferences › AI Integrations (model, effort, API key, endpoint, tool rounds per
-message), or export `ANTHROPIC_API_KEY` before launching; the key preference is stored as entered in
+Setup: Edit › Preferences › AI Integrations (API format, model, effort, API key, endpoint, tool
+rounds per message), or export `ANTHROPIC_API_KEY` before launching. **Test Model** sends one short
+message with the settings as typed (before OK) and shows who answered, or the API's error.
+
+*API format* `openai` speaks the OpenAI Chat Completions format (`POST <endpoint>/chat/completions`,
+`Authorization: Bearer`), which OpenAI and most other providers and local servers accept (DeepSeek
+`https://api.deepseek.com/v1`, Qwen/DashScope `https://dashscope.aliyuncs.com/compatible-mode/v1`,
+Ollama `http://localhost:11434/v1`, vLLM, LM Studio…). The model id is required; the key falls back
+to `OPENAI_API_KEY` and may be empty for a server on this computer or the local network (where plain
+`http://` is accepted too). The runner keeps the conversation in the Messages shape and
+`agent/llm.rs` › `openai` translates each request (system message, `tool_calls`, `tool` results,
+screenshots as `image_url` parts) and reply. Such models get only the built-in tools (no server-side
+tool search) and reach every command through `command_list` + `command_run`; a model that refuses
+images (a 400 on a request with images) gets text-only requests from then on. Effort and refusal
+fallbacks are Claude-only and hidden in that mode; the key preference is stored as entered in
 the settings file, so the environment variable is the better choice on a shared machine. The panel
 is shown by default (also in layouts saved before it existed); Window › Agent (`window.toggle.agent`)
 hides and shows it, and the strip's chevron collapses it. Enter sends, Shift+Enter inserts a newline, Stop

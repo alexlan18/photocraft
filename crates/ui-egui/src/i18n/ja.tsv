@@ -4128,3 +4128,11 @@ curves	Smooth	スムーズ
 	Copies the URL and token as an mcpServers entry for Claude Desktop, Claude Code or Cursor	URL とトークンを Claude Desktop、Claude Code、Cursor 用の mcpServers エントリとしてコピーします
 	MCP server not running: {error}	MCP サーバーは実行されていません：{error}
 	Turn on the MCP server to let other programs use PhotoCraft's tools. Changes take effect after OK or Apply.	MCP サーバーをオンにすると、他のプログラムから PhotoCraft のツールを使えます。変更は「OK」または「適用」の後に反映されます。
+	Agent API format	エージェント API 形式
+	Anthropic (Claude)	Anthropic（Claude）
+	OpenAI compatible	OpenAI 互換
+	Test Model	モデルをテスト
+	Sends one short message with the agent settings above, before you press OK	上のエージェント設定で短いメッセージを 1 件送信します（OK を押す前に試せます）
+	Testing…	テスト中…
+	Works: {result}	成功：{result}
+	Failed: {error}	失敗：{error}

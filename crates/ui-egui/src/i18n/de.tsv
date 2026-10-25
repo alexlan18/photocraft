@@ -3462,3 +3462,11 @@ curves	Smooth	Glätten
 	Copies the URL and token as an mcpServers entry for Claude Desktop, Claude Code or Cursor	Kopiert URL und Token als mcpServers-Eintrag für Claude Desktop, Claude Code oder Cursor
 	MCP server not running: {error}	MCP-Server läuft nicht: {error}
 	Turn on the MCP server to let other programs use PhotoCraft's tools. Changes take effect after OK or Apply.	Schalten Sie den MCP-Server ein, damit andere Programme die Werkzeuge von PhotoCraft nutzen können. Änderungen gelten nach OK oder Anwenden.
+	Agent API format	Agent-API-Format
+	Anthropic (Claude)	Anthropic (Claude)
+	OpenAI compatible	OpenAI-kompatibel
+	Test Model	Modell testen
+	Sends one short message with the agent settings above, before you press OK	Sendet eine kurze Nachricht mit den obigen Agent-Einstellungen, noch bevor Sie OK drücken
+	Testing…	Wird getestet…
+	Works: {result}	Funktioniert: {result}
+	Failed: {error}	Fehlgeschlagen: {error}

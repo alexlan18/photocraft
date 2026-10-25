@@ -516,6 +516,7 @@ fn main() -> eframe::Result {
             }
             app.services.mcp_server = Some(agent_host::mcp_server(control_tx.clone(), cc.egui_ctx.clone()));
             app.services.agent_host = Some(agent_host::host(control_tx, cc.egui_ctx.clone()));
+            app.services.agent_test = Some(Box::new(photocraft_automation::agent::test_model));
             #[cfg(target_os = "macos")]
             {
                 app.services.os_events = Some(apple_events.connect(&cc.egui_ctx));

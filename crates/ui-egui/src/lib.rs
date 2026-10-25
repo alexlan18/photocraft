@@ -614,6 +614,8 @@ pub struct Services {
     /// Starts an Agent panel session (desktop: `photocraft-automation`'s runner over the app's
     /// own MCP server). `None` on the web, where the panel says so.
     pub agent_host: Option<photocraft_engine::agent::AgentHostFn>,
+    /// Tests a model for Preferences › AI Integrations › Test Model (desktop). `None` on the web.
+    pub agent_test: Option<photocraft_engine::agent::AgentTestFn>,
     /// Starts and stops the MCP server for other programs (desktop: `photocraft-automation`'s
     /// HTTP endpoint over the app's own tools). `None` on the web.
     pub mcp_server: Option<photocraft_engine::agent::McpServerHostFn>,

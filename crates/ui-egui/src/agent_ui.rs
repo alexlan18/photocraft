@@ -90,6 +90,42 @@ pub struct AgentRuntime {
     textures: HashMap<usize, Option<TextureHandle>>,
     /// A session's start failed with this message (shown until the next attempt).
     pub start_error: Option<String>,
+    /// Preferences › AI Integrations › Test Model: the request in flight, then its outcome.
+    pub test: Option<std::sync::mpsc::Receiver<Result<String, String>>>,
+    pub test_result: Option<Result<String, String>>,
+}
+
+/// Start testing the model with `settings` (the Preferences draft, not yet saved).
+pub fn start_test(app: &mut PhotocraftApp, settings: AgentSettings) {
+    match app.services.agent_test.as_mut() {
+        Some(test) => {
+            app.agent.test = Some(test(settings));
+            app.agent.test_result = None;
+        }
+        None => app.agent.test_result = Some(Err(tl!("The agent needs the desktop app.").to_string())),
+    }
+}
+
+/// The model test's state for the Preferences dialog: `{pending}` or `{ok, text}` or null.
+pub fn poll_test(app: &mut PhotocraftApp) -> Value {
+    if let Some(rx) = &app.agent.test {
+        match rx.try_recv() {
+            Ok(r) => {
+                app.agent.test = None;
+                app.agent.test_result = Some(r);
+            }
+            Err(std::sync::mpsc::TryRecvError::Empty) => return json!({"pending": true}),
+            Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                app.agent.test = None;
+                app.agent.test_result = Some(Err("the test stopped without an answer".into()));
+            }
+        }
+    }
+    match &app.agent.test_result {
+        Some(Ok(t)) => json!({"ok": true, "text": t}),
+        Some(Err(e)) => json!({"ok": false, "text": e}),
+        None => Value::Null,
+    }
 }
 
 fn rect_id() -> egui::Id {

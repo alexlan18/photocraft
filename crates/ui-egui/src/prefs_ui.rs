@@ -1221,8 +1221,18 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
             let mut mcp = crate::mcp_server_ui::describe(app);
             mcp["config"] = json!(app.mcp_server.status.as_ref().map(crate::mcp_server_ui::client_config));
             f.insert("__mcp".into(), mcp);
+            let test = crate::agent_ui::poll_test(app);
+            if test.get("pending") == Some(&json!(true)) {
+                ui.ctx().request_repaint_after(std::time::Duration::from_millis(100));
+            }
+            f.insert("__agentTest".into(), test);
             let system = system_theme(app, ui.ctx());
             prefs_body(ui, f, system);
+            // Test Model tests the values as typed, before OK.
+            if f.remove("__agentTestRequest").is_some() {
+                let settings = draft_agent_settings(app, f);
+                crate::agent_ui::start_test(app, settings);
+            }
         }
         "shortcuts" => shortcuts_body(app, ui, f),
         "presets" => presets_body(app, ui, f),
@@ -1230,6 +1240,15 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
         "mismatch" => mismatch_body(ui, f),
         _ => {}
     }
+}
+
+/// The agent settings the Preferences draft in `f` holds (AI Integrations as typed, before OK).
+fn draft_agent_settings(app: &PhotocraftApp, f: &Map<String, Value>) -> photocraft_engine::agent::AgentSettings {
+    let mut p = app.session.prefs().clone();
+    if let Some(i) = f.get("values").and_then(|v| v.get("integrations")).and_then(|v| serde_json::from_value(v.clone()).ok()) {
+        p.integrations = i;
+    }
+    photocraft_engine::agent::AgentSettings::from_prefs(&p)
 }
 
 /// Performance › Graphics: the compositor's GPU memory budget and whether the active document's
@@ -1263,6 +1282,7 @@ fn humanize(key: &str) -> String {
         "lightTheme" => return "Light Theme".into(),
         "automaticallyCheckUpdates" => return "Automatically Check for Updates".into(),
         // The Agent panel (Window › Agent).
+        "agentProvider" => return "Agent API format".into(),
         "agentModel" => return "Agent model".into(),
         "agentEffort" => return "Agent effort".into(),
         "agentApiKey" => return "Agent API key".into(),
@@ -1346,6 +1366,8 @@ fn choice_label(v: &str) -> String {
         "ahd" => "AHD (adaptive homogeneity)".into(),
         "mhc" => "Malvar–He–Cutler".into(),
         "cpu" => "CPU (no GPU acceleration)".into(),
+        "anthropic" => "Anthropic (Claude)".into(),
+        "openai" => "OpenAI compatible".into(),
         v => humanize(v),
     }
 }
@@ -1480,6 +1502,9 @@ fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>, system: Option<egui
                         gpu_status_rows(ui, f.get("__gpuInfo"), f.get("__gpuAdapters"), obj);
                     }
                     if section == "integrations" {
+                        if agent_test_row(ui, f.get("__agentTest")) {
+                            f.insert("__agentTestRequest".into(), json!(true));
+                        }
                         mcp_status_rows(ui, f.get("__mcp"));
                     }
                     ui.add_space(8.0);
@@ -1501,6 +1526,29 @@ fn prefs_body(ui: &mut egui::Ui, f: &mut Map<String, Value>, system: Option<egui
     if let Some((path, name)) = ctx_take_pick(ui) {
         crate::color_picker_ui::request_field(f, &format!("/values/{}", path.replace('.', "/")), &crate::color_picker_ui::title_for(&name));
     }
+}
+
+/// Preferences › AI Integrations › Test Model: one short request with the agent settings as typed.
+/// Returns whether the button was clicked.
+fn agent_test_row(ui: &mut egui::Ui, state: Option<&Value>) -> bool {
+    let t = Tokens::get(ui.ctx());
+    let pending = state.and_then(|s| s.get("pending")).and_then(Value::as_bool).unwrap_or(false);
+    ui.add_space(8.0);
+    let mut clicked = false;
+    ui.horizontal(|ui| {
+        let button = ui.add_enabled_ui(!pending, |ui| crate::widgets::secondary_button(ui, tl!("Test Model"), 110.0)).inner;
+        clicked = button.on_hover_text(tl!("Sends one short message with the agent settings above, before you press OK")).clicked();
+        if pending {
+            ui.spinner();
+            ui.label(RichText::new(tl!("Testing…")).color(t.text_dim));
+        } else if let Some(s) = state.filter(|s| !s.is_null()) {
+            let ok = s.get("ok").and_then(Value::as_bool).unwrap_or(false);
+            let text = s.get("text").and_then(Value::as_str).unwrap_or("");
+            let line = if ok { crate::i18n::fmt(tl!("Works: {result}"), &[("result", text)]) } else { crate::i18n::fmt(tl!("Failed: {error}"), &[("error", text)]) };
+            ui.add(egui::Label::new(RichText::new(line).color(if ok { t.text } else { t.danger })).wrap());
+        }
+    });
+    clicked
 }
 
 /// Preferences › AI Integrations: whether the MCP server for other programs runs, where, and a
@@ -1818,7 +1866,11 @@ fn field_visible(section: &str, obj: &Map<String, Value>, k: &str, query: &str) 
         // The browser presents frames itself: Low-Latency Drawing does nothing there.
         || (cfg!(target_arch = "wasm32") && path == "performance.lowLatencyDrawing")
         || (section == "export" && !export_field_visible(obj, k))
-        || (section == "tools" && !tools_field_visible(obj, k));
+        || (section == "tools" && !tools_field_visible(obj, k))
+        // Effort and refusal fallbacks are Claude's; an OpenAI-compatible API has neither.
+        || (section == "integrations"
+            && matches!(k, "agentEffort" | "agentRefusalFallbacks")
+            && obj.get("agentProvider").and_then(Value::as_str) == Some(photocraft_engine::agent::PROVIDER_OPENAI));
     (query.is_empty() || preference_matches(section, k, query))
         && !drawn_elsewhere
         && !prefs::is_hidden(&path)
@@ -1935,9 +1987,14 @@ fn field_rows(ui: &mut egui::Ui, section: &str, obj: &mut Map<String, Value>, ke
                 let mut s = s.clone();
                 // The Agent panel's API key is a secret: shown as dots, like a password field.
                 // Empty agent fields use a default, shown as the field's hint.
+                // An OpenAI-compatible API has its own defaults (and no default model).
+                let openai = obj.get("agentProvider").and_then(Value::as_str) == Some(photocraft_engine::agent::PROVIDER_OPENAI);
                 let hint = match path.as_str() {
+                    "integrations.agentModel" if openai => "gpt-4o, deepseek-chat, qwen-plus, llama3.1…",
                     "integrations.agentModel" => photocraft_engine::agent::DEFAULT_MODEL,
+                    "integrations.agentBaseUrl" if openai => photocraft_engine::agent::OPENAI_DEFAULT_BASE_URL,
                     "integrations.agentBaseUrl" => photocraft_engine::agent::DEFAULT_BASE_URL,
+                    "integrations.agentApiKey" if openai => photocraft_engine::agent::OPENAI_API_KEY_ENV,
                     "integrations.agentApiKey" => photocraft_engine::agent::API_KEY_ENV,
                     "integrations.mcpToken" => "generated when the server starts",
                     _ => "",
@@ -4702,4 +4759,30 @@ mod tests {
         let d = crate::menus::invoke(&mut app, &ctx, "edit.presets.presetManager", json!({})).unwrap()["dialog"].as_u64().unwrap();
         assert!(crate::dialogs::confirm(&mut app, d).is_ok());
     }
+
+    #[test]
+    fn test_model_uses_the_draft_and_reports_the_outcome() {
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+        let mut f = Map::new();
+        let mut values = Value::Object(preference_values(app.session.prefs()));
+        values["integrations"]["agentProvider"] = json!("openai");
+        values["integrations"]["agentModel"] = json!("deepseek-chat");
+        f.insert("values".into(), values);
+        let s = draft_agent_settings(&app, &f);
+        assert!(s.is_openai() && s.model == "deepseek-chat", "{s:?}");
+        assert_eq!(app.session.prefs().integrations.agent_provider, "anthropic", "the saved preferences are untouched");
+        // No tester (the web build): an error, not a hang.
+        crate::agent_ui::start_test(&mut app, s.clone());
+        assert_eq!(crate::agent_ui::poll_test(&mut app)["ok"], json!(false));
+        app.services.agent_test = Some(Box::new(|s: photocraft_engine::agent::AgentSettings| {
+            let (tx, rx) = std::sync::mpsc::channel();
+            tx.send(Ok(format!("{} answered \"OK\"", s.model))).unwrap();
+            rx
+        }));
+        crate::agent_ui::start_test(&mut app, s);
+        let r = crate::agent_ui::poll_test(&mut app);
+        assert_eq!((r["ok"].clone(), r["text"].clone()), (json!(true), json!("deepseek-chat answered \"OK\"")));
+        assert_eq!(crate::agent_ui::poll_test(&mut app)["ok"], json!(true), "the outcome stays until the next test");
+    }
 }
+

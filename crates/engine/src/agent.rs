@@ -14,6 +14,18 @@ use crate::prefs::Preferences;
 
 /// The environment variable that supplies the API key when the preference is empty.
 pub const API_KEY_ENV: &str = "ANTHROPIC_API_KEY";
+/// The same for an OpenAI-compatible endpoint.
+pub const OPENAI_API_KEY_ENV: &str = "OPENAI_API_KEY";
+
+/// The API formats the panel speaks: Anthropic's Messages API (Claude), or the OpenAI Chat
+/// Completions format that OpenAI and many other providers and local servers (DeepSeek, Qwen,
+/// Mistral, Ollama, vLLM, LM Studio, …) accept.
+pub const PROVIDERS: &[&str] = &["anthropic", "openai"];
+pub const PROVIDER_ANTHROPIC: &str = "anthropic";
+pub const PROVIDER_OPENAI: &str = "openai";
+/// The OpenAI-compatible base URL used when the endpoint preference is empty (`/chat/completions`
+/// is appended).
+pub const OPENAI_DEFAULT_BASE_URL: &str = "https://api.openai.com/v1";
 
 /// The model the panel uses unless Preferences name another.
 pub const DEFAULT_MODEL: &str = "claude-opus-5-5";
@@ -31,11 +43,15 @@ pub const EFFORT_LEVELS: &[&str] = &["low", "medium", "high", "xhigh", "max"];
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct AgentSettings {
+    /// [`PROVIDER_ANTHROPIC`] or [`PROVIDER_OPENAI`].
+    pub provider: String,
     pub model: String,
     pub effort: String,
-    /// The Messages API origin; empty means [`DEFAULT_BASE_URL`].
+    /// The Messages API origin ([`DEFAULT_BASE_URL`]), or for OpenAI-compatible APIs the base
+    /// URL `/chat/completions` is appended to ([`OPENAI_DEFAULT_BASE_URL`]).
     pub base_url: String,
-    /// Empty: read [`API_KEY_ENV`] at session start.
+    /// Empty: read [`API_KEY_ENV`] (or [`OPENAI_API_KEY_ENV`]) at session start. An
+    /// OpenAI-compatible server may need none (a local Ollama).
     pub api_key: String,
     pub max_turns: u32,
     /// Opt into the server-side refusal fallbacks on the models that offer them.
@@ -45,6 +61,7 @@ pub struct AgentSettings {
 impl Default for AgentSettings {
     fn default() -> Self {
         Self {
+            provider: PROVIDER_ANTHROPIC.into(),
             model: DEFAULT_MODEL.into(),
             effort: DEFAULT_EFFORT.into(),
             base_url: DEFAULT_BASE_URL.into(),
@@ -62,35 +79,72 @@ impl AgentSettings {
         let p = &prefs.integrations;
         let d = Self::default();
         let pick = |v: &str, default: &str| if v.trim().is_empty() { default.to_string() } else { v.trim().to_string() };
+        let openai = p.agent_provider == PROVIDER_OPENAI;
+        let (provider, model, base_url, key_env) = if openai {
+            // No default model: every OpenAI-compatible provider names its own.
+            (PROVIDER_OPENAI, p.agent_model.trim().to_string(), pick(&p.agent_base_url, OPENAI_DEFAULT_BASE_URL), OPENAI_API_KEY_ENV)
+        } else {
+            (PROVIDER_ANTHROPIC, pick(&p.agent_model, &d.model), pick(&p.agent_base_url, &d.base_url), API_KEY_ENV)
+        };
         Self {
-            model: pick(&prefs.integrations.agent_model, &d.model),
-            effort: if EFFORT_LEVELS.contains(&prefs.integrations.agent_effort.as_str()) { p.agent_effort.clone() } else { d.effort },
-            base_url: pick(&prefs.integrations.agent_base_url, &d.base_url).trim_end_matches('/').to_string(),
-            api_key: if prefs.integrations.agent_api_key.trim().is_empty() {
-                std::env::var(API_KEY_ENV).unwrap_or_default().trim().to_string()
-            } else {
-                p.agent_api_key.trim().to_string()
-            },
-            max_turns: prefs.integrations.agent_max_turns.clamp(1, 1000),
-            refusal_fallbacks: prefs.integrations.agent_refusal_fallbacks,
+            provider: provider.into(),
+            model,
+            effort: if EFFORT_LEVELS.contains(&p.agent_effort.as_str()) { p.agent_effort.clone() } else { d.effort },
+            base_url: base_url.trim_end_matches('/').to_string(),
+            api_key: if p.agent_api_key.trim().is_empty() { std::env::var(key_env).unwrap_or_default().trim().to_string() } else { p.agent_api_key.trim().to_string() },
+            max_turns: p.agent_max_turns.clamp(1, 1000),
+            refusal_fallbacks: p.agent_refusal_fallbacks,
         }
+    }
+
+    /// Talks the OpenAI Chat Completions format.
+    pub fn is_openai(&self) -> bool {
+        self.provider == PROVIDER_OPENAI
     }
 
     /// Why a session can't start, if it can't (no key, an unusable endpoint).
     pub fn check(&self) -> Result<(), String> {
-        if self.api_key.is_empty() {
-            return Err(format!("no API key: set one in Edit › Preferences › AI Integrations, or export {API_KEY_ENV} before launching"));
+        if !PROVIDERS.contains(&self.provider.as_str()) {
+            return Err(format!("unknown API format `{}` (anthropic or openai)", self.provider));
+        }
+        // OpenAI-compatible servers on this computer or the local network often take no key.
+        if self.api_key.is_empty() && !(self.is_openai() && local_url(&self.base_url)) {
+            let env = if self.is_openai() { OPENAI_API_KEY_ENV } else { API_KEY_ENV };
+            return Err(format!("no API key: set one in Edit › Preferences › AI Integrations, or export {env} before launching"));
         }
         if self.api_key.chars().any(|c| c.is_control() || c.is_whitespace()) {
             return Err("the API key contains whitespace or control characters".into());
         }
-        if !(self.base_url.starts_with("https://") || self.base_url.starts_with("http://localhost") || self.base_url.starts_with("http://127.0.0.1")) {
-            return Err("the API endpoint must be an https:// URL (http:// is accepted for localhost only)".into());
+        if !(self.base_url.starts_with("https://") || (self.base_url.starts_with("http://") && local_url(&self.base_url))) {
+            return Err("the API endpoint must be an https:// URL (http:// is accepted for this computer and the local network only)".into());
         }
-        if self.model.trim().is_empty() || self.model.chars().any(|c| c.is_whitespace()) {
-            return Err("the model id is empty or contains whitespace".into());
+        if self.model.trim().is_empty() {
+            return Err(if self.is_openai() {
+                "no model: enter the provider's model id in Edit › Preferences › AI Integrations (for example gpt-4o, deepseek-chat, qwen-plus or llama3.1)".into()
+            } else {
+                "the model id is empty".into()
+            });
+        }
+        if self.model.chars().any(|c| c.is_whitespace() || c.is_control()) {
+            return Err("the model id contains whitespace".into());
         }
         Ok(())
+    }
+}
+
+/// An `http(s)://` URL whose host is this computer or a private network address (a local model
+/// server), where plain HTTP and no key are acceptable.
+fn local_url(url: &str) -> bool {
+    let Some(rest) = url.strip_prefix("http://").or_else(|| url.strip_prefix("https://")) else { return false };
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or("");
+    let host = if let Some(v6) = authority.strip_prefix('[') { v6.split(']').next().unwrap_or("") } else { authority.rsplit_once(':').map_or(authority, |(h, _)| h) };
+    if host.eq_ignore_ascii_case("localhost") {
+        return true;
+    }
+    match host.parse::<std::net::IpAddr>() {
+        Ok(std::net::IpAddr::V4(ip)) => ip.is_loopback() || ip.is_private() || ip.is_link_local(),
+        Ok(std::net::IpAddr::V6(ip)) => ip.is_loopback() || (ip.segments()[0] & 0xfe00) == 0xfc00,
+        Err(_) => false,
     }
 }
 
@@ -159,6 +213,11 @@ pub struct AgentHandle {
 /// none). Returns the error to show in the panel when the session can't start.
 pub type AgentHostFn = Box<dyn FnMut(AgentSettings) -> Result<AgentHandle, String>>;
 
+/// Tests a model with these settings (Preferences › AI Integrations › Test Model) on a
+/// background thread: one short request, answered on the receiver with a line to show, or why
+/// it failed.
+pub type AgentTestFn = Box<dyn FnMut(AgentSettings) -> Receiver<Result<String, String>>>;
+
 /// The port the MCP server for other programs listens on unless Preferences name another.
 pub const DEFAULT_MCP_PORT: u16 = 8765;
 
@@ -220,6 +279,7 @@ mod tests {
         assert!(s.check().unwrap_err().contains("https://"));
         s.base_url = "http://localhost:8080".into();
         assert!(s.check().is_ok());
+        s.base_url = DEFAULT_BASE_URL.into();
         s.model = "a b".into();
         assert!(s.check().unwrap_err().contains("model"));
         s.model = DEFAULT_MODEL.into();
@@ -236,6 +296,28 @@ mod tests {
         assert_eq!(McpServerSettings::from_prefs(&with(9000)), Some(McpServerSettings { port: 9000, token: "t".into() }));
         assert_eq!(McpServerSettings::from_prefs(&with(0)).map(|s| s.port), Some(DEFAULT_MCP_PORT));
         assert_eq!(McpServerSettings::from_prefs(&with(70_000)).map(|s| s.port), Some(DEFAULT_MCP_PORT));
+    }
+
+    #[test]
+    fn openai_compatible_settings_take_their_own_defaults() {
+        let with = |i: Integrations| AgentSettings::from_prefs(&Preferences { integrations: i, ..Default::default() });
+        let s = with(Integrations { agent_provider: "openai".into(), agent_api_key: "k".into(), ..Default::default() });
+        assert!(s.is_openai());
+        assert_eq!(s.base_url, OPENAI_DEFAULT_BASE_URL);
+        assert!(s.check().unwrap_err().contains("no model"), "an OpenAI-compatible model must be named");
+        let s = with(Integrations { agent_provider: "openai".into(), agent_model: "deepseek-chat".into(), agent_base_url: "https://api.deepseek.com/v1/".into(), agent_api_key: "k".into(), ..Default::default() });
+        assert_eq!((s.model.as_str(), s.base_url.as_str()), ("deepseek-chat", "https://api.deepseek.com/v1"));
+        assert!(s.check().is_ok());
+        // A local server needs no key, and may be plain HTTP on the local network.
+        for url in ["http://localhost:11434/v1", "http://127.0.0.1:8000/v1", "http://192.168.1.20:1234/v1", "http://[::1]:8080/v1"] {
+            let s = AgentSettings { provider: "openai".into(), model: "llama3.1".into(), base_url: url.into(), api_key: String::new(), ..Default::default() };
+            assert!(s.check().is_ok(), "{url}: {:?}", s.check());
+        }
+        let s = AgentSettings { provider: "openai".into(), model: "m".into(), base_url: "http://api.example.com/v1".into(), api_key: "k".into(), ..Default::default() };
+        assert!(s.check().is_err());
+        let s = AgentSettings { provider: "openai".into(), model: "m".into(), base_url: OPENAI_DEFAULT_BASE_URL.into(), api_key: String::new(), ..Default::default() };
+        assert!(s.check().unwrap_err().contains(OPENAI_API_KEY_ENV));
+        assert!(AgentSettings { provider: "gemini".into(), api_key: "k".into(), ..Default::default() }.check().is_err());
     }
 
     #[test]

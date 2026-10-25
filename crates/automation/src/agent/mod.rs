@@ -6,4 +6,4 @@
 pub mod llm;
 pub mod runner;
 
-pub use runner::{SYSTEM_PROMPT, api_tools, spawn, spawn_with};
+pub use runner::{SYSTEM_PROMPT, api_tools, spawn, spawn_with, system_prompt, test_model, test_model_with};

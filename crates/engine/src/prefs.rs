@@ -936,8 +936,11 @@ pub struct Integrations {
     pub allow_agent_control: bool,
     /// Default control port (0 = only when `--control` is given).
     pub control_port: u32,
-    /// The Agent panel (Window › Agent): the Claude model id; empty = the default
-    /// ([`crate::agent::DEFAULT_MODEL`]).
+    /// The Agent panel's API format: `anthropic` (Claude's Messages API) or `openai` (the
+    /// OpenAI Chat Completions format other providers and local servers accept).
+    pub agent_provider: String,
+    /// The Agent panel (Window › Agent): the model id; empty = the default
+    /// ([`crate::agent::DEFAULT_MODEL`]) for Claude; required for OpenAI-compatible APIs.
     pub agent_model: String,
     /// The Agent panel's `effort` (low, medium, high, xhigh, max).
     pub agent_effort: String,
@@ -964,6 +967,7 @@ impl Default for Integrations {
         Self {
             allow_agent_control: true,
             control_port: 0,
+            agent_provider: crate::agent::PROVIDER_ANTHROPIC.into(),
             agent_model: String::new(),
             agent_effort: crate::agent::DEFAULT_EFFORT.into(),
             agent_api_key: String::new(),
@@ -1204,6 +1208,7 @@ pub fn choices(path: &str) -> Option<&'static [&'static str]> {
         "interface.canvasBorder" => CanvasBorder::NAMES,
         "interface.uiScale" => UiScale::NAMES,
         "integrations.agentEffort" => crate::agent::EFFORT_LEVELS,
+        "integrations.agentProvider" => crate::agent::PROVIDERS,
         "interface.uiFontSize" => UiFontSize::NAMES,
         "historyLog.destination" => LogDestination::NAMES,
         "historyLog.detail" => LogDetail::NAMES,

@@ -4379,3 +4379,11 @@ layerLabel	No Color	Sem cor
 	Copies the URL and token as an mcpServers entry for Claude Desktop, Claude Code or Cursor	Copia a URL e o token como uma entrada mcpServers para Claude Desktop, Claude Code ou Cursor
 	MCP server not running: {error}	Servidor MCP parado: {error}
 	Turn on the MCP server to let other programs use PhotoCraft's tools. Changes take effect after OK or Apply.	Ative o servidor MCP para que outros programas usem as ferramentas do PhotoCraft. As alterações valem após OK ou Aplicar.
+	Agent API format	Formato da API do agente
+	Anthropic (Claude)	Anthropic (Claude)
+	OpenAI compatible	Compatível com OpenAI
+	Test Model	Testar modelo
+	Sends one short message with the agent settings above, before you press OK	Envia uma mensagem curta com as configurações do agente acima, antes de clicar em OK
+	Testing…	Testando…
+	Works: {result}	Funciona: {result}
+	Failed: {error}	Falhou: {error}

@@ -4411,3 +4411,11 @@ navigator	Zoom	Zoom
 	Copies the URL and token as an mcpServers entry for Claude Desktop, Claude Code or Cursor	Copia la URL y el token como una entrada mcpServers para Claude Desktop, Claude Code o Cursor
 	MCP server not running: {error}	El servidor MCP no se está ejecutando: {error}
 	Turn on the MCP server to let other programs use PhotoCraft's tools. Changes take effect after OK or Apply.	Active el servidor MCP para que otros programas puedan usar las herramientas de PhotoCraft. Los cambios se aplican tras Aceptar o Aplicar.
+	Agent API format	Formato de API del agente
+	Anthropic (Claude)	Anthropic (Claude)
+	OpenAI compatible	Compatible con OpenAI
+	Test Model	Probar modelo
+	Sends one short message with the agent settings above, before you press OK	Envía un mensaje breve con los ajustes del agente de arriba, antes de pulsar Aceptar
+	Testing…	Probando…
+	Works: {result}	Funciona: {result}
+	Failed: {error}	Error: {error}

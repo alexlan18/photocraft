@@ -36,6 +36,45 @@ Prefer non-destructive edits (adjustment layers, masks, smart filters) when the 
 \n\
 Reply in the user's language, briefly: say what you changed and anything they should check. Ask before destructive or ambiguous operations (flattening, cropping, closing documents).";
 
+/// The tools paragraph for an OpenAI-compatible model, which has no server-side tool search: it
+/// gets the built-in tools only and reaches every command through `command_run`.
+const OPENAI_TOOLS: &str = "Tools: the built-in tools (session_list, doc_inspect, doc_new, doc_open, doc_save, command_list, command_run, command_batch, jobs_list, ui_inspect, ui_screenshot, ui_set, ui_menu_invoke, control_call). \
+Every edit is an engine command run with command_run {id, params}; there are about a thousand. Find ids and their parameter docs with command_list {filter} (for example \"blur\", \"layer.new\", \"levels\", \"select\", \"crop\", \"type\", \"adjust\"); \
+parameters are documented as {name: type = default} with ? marking optional ones.\n";
+
+/// The system prompt for this provider: the Claude one names the tool search, the
+/// OpenAI-compatible one `command_list` + `command_run`.
+pub fn system_prompt(settings: &AgentSettings) -> String {
+    if !settings.is_openai() {
+        return SYSTEM_PROMPT.to_string();
+    }
+    let start = SYSTEM_PROMPT.find("Tools:").unwrap_or(0);
+    let end = SYSTEM_PROMPT.find("\n\nWay of working").map_or(start, |e| e + 1);
+    format!("{}{}{}", &SYSTEM_PROMPT[..start], OPENAI_TOOLS, &SYSTEM_PROMPT[end..])
+}
+
+/// Tests the model with these settings on a background thread (Preferences › Test Model): the
+/// receiver gets one line to show, or why the request failed.
+pub fn test_model(settings: AgentSettings) -> Receiver<Result<String, String>> {
+    test_model_with(settings, Box::new(llm::Https::new()))
+}
+
+/// [`test_model`] with the transport supplied.
+pub fn test_model_with(settings: AgentSettings, transport: Box<dyn Transport>) -> Receiver<Result<String, String>> {
+    let (tx, rx) = channel();
+    let spawned = std::thread::Builder::new().name("photocraft-agent-test".into()).spawn({
+        let tx = tx.clone();
+        move || {
+            let r = settings.check().and_then(|()| Client::new(settings, transport).test());
+            let _ = tx.send(r);
+        }
+    });
+    if let Err(e) = spawned {
+        let _ = tx.send(Err(format!("could not start the test: {e}")));
+    }
+    rx
+}
+
 /// Tool results longer than this are cut for the model (with a note), so one verbose reply
 /// can't fill the context.
 const MAX_RESULT_CHARS: usize = 48_000;
@@ -71,7 +110,8 @@ pub fn spawn_with(settings: AgentSettings, server: PhotocraftMcp, transport: Box
     std::thread::Builder::new()
         .name("photocraft-agent".into())
         .spawn(move || {
-            let mut runner = Runner { client, events: event_tx, commands: command_rx, wake, max_turns, messages: Vec::new(), tools: Vec::new() };
+            let system = system_prompt(client.settings());
+            let mut runner = Runner { client, events: event_tx, commands: command_rx, wake, max_turns, system, messages: Vec::new(), tools: Vec::new() };
             runner.run(server);
         })
         .map_err(|e| format!("could not start the agent thread: {e}"))?;
@@ -84,7 +124,10 @@ struct Runner {
     commands: Receiver<AgentCommand>,
     wake: Arc<dyn Fn() + Send + Sync>,
     max_turns: u32,
-    /// The conversation, append-only, in the API's shape.
+    /// The system prompt for the provider.
+    system: String,
+    /// The conversation, append-only, in the Messages API's shape (translated per request for
+    /// OpenAI-compatible APIs).
     messages: Vec<Value>,
     /// The `tools` array of every request.
     tools: Vec<Value>,
@@ -119,7 +162,12 @@ impl Runner {
             Err(e) => return self.emit(AgentEvent::Error(format!("could not list the app's tools: {e}"))),
         };
         self.tools = api_tools(&listed, |name| classify.is_command_tool(name));
-        self.emit(AgentEvent::Status(format!("Ready: {} tools", listed.len())));
+        let ready = if self.client.settings().is_openai() {
+            format!("Ready: {} tools ({} model)", listed.iter().filter(|t| !classify.is_command_tool(&t.name)).count(), self.client.settings().model)
+        } else {
+            format!("Ready: {} tools", listed.len())
+        };
+        self.emit(AgentEvent::Status(ready));
         let mut queued: Vec<String> = Vec::new();
         loop {
             let cmd = match queued.pop() {
@@ -175,7 +223,7 @@ impl Runner {
             }
             rounds += 1;
             self.emit(AgentEvent::Status("Thinking…".into()));
-            let reply = match self.client.complete(SYSTEM_PROMPT, &self.tools, &self.messages) {
+            let reply = match self.client.complete(&self.system, &self.tools, &self.messages) {
                 Ok(r) => r,
                 Err(e) => {
                     // The failed exchange leaves no trace: the user can resend.
@@ -502,5 +550,48 @@ mod tests {
         assert_eq!(bounded("héllo", 10), "héllo");
         let cut = bounded("日本語テキスト", 3);
         assert!(cut.starts_with("日本語…"), "{cut}");
+    }
+
+    #[test]
+    fn openai_models_are_told_to_use_command_run_not_the_tool_search() {
+        let p = system_prompt(&AgentSettings { provider: "openai".into(), ..Default::default() });
+        assert!(p.contains("command_run {id, params}") && !p.contains("tool_search_tool_regex"), "{p}");
+        assert!(p.starts_with("You are the Agent panel") && p.contains("Way of working"));
+        assert_eq!(system_prompt(&AgentSettings::default()), SYSTEM_PROMPT);
+    }
+
+    #[test]
+    fn the_model_test_checks_the_settings_first() {
+        let (t, requests) = Scripted::new(vec![]);
+        let rx = test_model_with(AgentSettings { api_key: String::new(), ..Default::default() }, Box::new(t));
+        let e = rx.recv_timeout(Duration::from_secs(10)).unwrap().unwrap_err();
+        assert!(e.contains("no API key"), "{e}");
+        assert!(requests.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn an_openai_compatible_model_drives_the_tools() {
+        let server = PhotocraftMcp::headless();
+        let call = json!({"model": "local", "choices": [{"finish_reason": "tool_calls", "message": {"content": null, "tool_calls": [
+            {"id": "c1", "type": "function", "function": {"name": "doc_new", "arguments": "{\"width\":16,\"height\":8}"}}]}}]});
+        let done = json!({"model": "local", "choices": [{"finish_reason": "stop", "message": {"content": "Made it."}}]});
+        let (transport, requests) = Scripted::new(vec![Ok((200, call)), Ok((200, done))]);
+        let s = AgentSettings { provider: "openai".into(), model: "local".into(), base_url: "http://localhost:11434/v1".into(), api_key: String::new(), max_turns: 3, ..Default::default() };
+        let handle = spawn_with(s, server, Box::new(transport), Arc::new(|| {})).unwrap();
+        drain(&handle, |e| matches!(e, AgentEvent::Status(s) if s.starts_with("Ready")));
+        handle.commands.send(AgentCommand::Send("new doc".into())).unwrap();
+        let events = drain(&handle, |e| matches!(e, AgentEvent::TurnDone { .. }));
+        assert!(events.iter().any(|e| matches!(e, AgentEvent::ToolResult { name, ok: true, .. } if name == "doc_new")), "{events:?}");
+        assert!(events.iter().any(|e| matches!(e, AgentEvent::AssistantText(t) if t == "Made it.")));
+        let r = requests.lock().unwrap();
+        // Chat Completions shape: system first, functions only (no deferred tools), and the tool
+        // result as a `tool` message after the assistant's call.
+        assert_eq!(r[0]["messages"][0]["role"], "system");
+        assert!(r[0]["tools"].as_array().unwrap().iter().all(|t| t["type"] == "function"));
+        assert!(r[0]["tools"].as_array().unwrap().len() < 64);
+        let second = r[1]["messages"].as_array().unwrap();
+        assert_eq!(second[2]["tool_calls"][0]["id"], "c1");
+        assert_eq!(second[3]["role"], "tool");
+        assert_eq!(second[3]["tool_call_id"], "c1");
     }
 }

@@ -3118,3 +3118,11 @@ curves	Smooth	平滑
 	Copies the URL and token as an mcpServers entry for Claude Desktop, Claude Code or Cursor	将 URL 和令牌复制为 mcpServers 条目，用于 Claude Desktop、Claude Code 或 Cursor
 	MCP server not running: {error}	MCP 服务器未运行：{error}
 	Turn on the MCP server to let other programs use PhotoCraft's tools. Changes take effect after OK or Apply.	开启 MCP 服务器，让其他程序使用 PhotoCraft 的工具。更改在点击“确定”或“应用”后生效。
+	Agent API format	智能体 API 格式
+	Anthropic (Claude)	Anthropic（Claude）
+	OpenAI compatible	OpenAI 兼容
+	Test Model	测试模型
+	Sends one short message with the agent settings above, before you press OK	使用上方的智能体设置发送一条简短消息（无需先点“确定”）
+	Testing…	正在测试…
+	Works: {result}	可用：{result}
+	Failed: {error}	失败：{error}
