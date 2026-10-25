@@ -165,6 +165,16 @@ try {
     if ($Target -eq 'web') { Invoke-Native 'cargo xtask wasm' { cargo xtask wasm } }
   }
 
+  # The MSI needs WiX v5 and its two extensions. Without them, make the portable zip (cargo only)
+  # rather than stopping, and say how to get the installer.
+  if (-not $Portable -and $Target -eq 'windows' -and -not (Get-Command wix -ErrorAction SilentlyContinue)) {
+    Write-Warning ("wix not found, so no MSI installer this time: building the portable zip instead.`n" +
+      "  For the MSI, install WiX v5 (needs the .NET SDK) and run this script again:`n" +
+      "    dotnet tool install --global wix --version 5.0.2`n" +
+      "    wix extension add -g WixToolset.UI.wixext/5.0.2 WixToolset.Util.wixext/5.0.2")
+    $Portable = [System.Management.Automation.SwitchParameter]::new($true)
+  }
+
   # ---- release packages: the platform scripts ----------------------------------------------------
   if (-not $Portable) {
     $skip = if ($SkipBuild) { @('--skip-build') } else { @() }
@@ -172,14 +182,6 @@ try {
       'windows' {
         $a = if ($Arch) { $Arch } else { 'x64' }
         if ($a -notin 'x64', 'x86', 'arm64') { throw "-Arch for Windows is x64, x86 or arm64 (got $a)" }
-        # The MSI needs WiX v5 and its two extensions; check before a long release build.
-        if (-not (Get-Command wix -ErrorAction SilentlyContinue)) {
-          throw ("wix not found: the MSI installer needs WiX v5. Install it with`n" +
-            "  dotnet tool install --global wix --version 5.0.2`n" +
-            "  wix extension add -g WixToolset.UI.wixext/5.0.2 WixToolset.Util.wixext/5.0.2`n" +
-            "or make the portable zip instead, which needs only cargo:`n" +
-            "  .\shell\build.ps1 -Portable")
-        }
         & (Join-Path $Root 'packaging/windows/package.ps1') -Arch $a -SkipBuild:$SkipBuild
       }
       'macos' {
