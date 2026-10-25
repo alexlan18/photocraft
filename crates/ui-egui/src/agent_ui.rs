@@ -250,9 +250,11 @@ pub fn clear(app: &mut PhotocraftApp) {
 
 // ----------------------------------------------------------------------------- drawing
 
-/// The side panel, outermost on the dock's side. Draws nothing when Window › Agent is off.
+/// The side panel, outermost on the dock's side. Draws nothing when Window › Agent is off or
+/// the app has no agent host.
 pub fn side_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    if !app.ui.panels.agent {
+    // Nothing to show where no agent can run (the web build): Window › Agent is greyed there.
+    if !app.ui.panels.agent || !available(app) {
         ui.ctx().data_mut(|d| d.remove::<Rect>(rect_id()));
         return;
     }
@@ -509,6 +511,13 @@ mod tests {
         PhotocraftApp::new(photocraft_engine::Session::new(), Services::default())
     }
 
+    /// An app whose agent host refuses to start a session: enough for the panel to be drawn.
+    fn desktop_app() -> PhotocraftApp {
+        let mut app = app();
+        app.services.agent_host = Some(Box::new(|_| Err("no sessions in tests".into())));
+        app
+    }
+
     #[test]
     fn events_build_the_transcript_and_results_find_their_call() {
         let mut app = app();
@@ -599,7 +608,7 @@ mod tests {
     #[test]
     fn the_control_channel_opens_and_inspects_the_panel() {
         use crate::control::{ControlRequest, Outcome, handle};
-        let mut app = app();
+        let mut app = desktop_app();
         let ctx = egui::Context::default();
         let call = |app: &mut PhotocraftApp, method: &str, params: Value| -> Value {
             let (req, _rx) = ControlRequest::new(method, params);
@@ -608,7 +617,10 @@ mod tests {
                 _ => panic!("{method}: expected an immediate reply"),
             }
         };
-        assert_eq!(call(&mut app, "ui.inspect", json!({}))["result"]["agent"]["open"], false);
+        // Shown by default.
+        assert_eq!(call(&mut app, "ui.inspect", json!({}))["result"]["agent"]["open"], true);
+        assert_eq!(call(&mut app, "ui.set", json!({"agentPanel": false}))["ok"], true);
+        assert!(!app.ui.panels.agent);
         assert_eq!(call(&mut app, "ui.set", json!({"agentPanel": true}))["ok"], true);
         assert!(app.ui.panels.agent);
         let v = call(&mut app, "ui.inspect", json!({}));
@@ -622,14 +634,31 @@ mod tests {
         let agent = items["result"].as_array().into_iter().flatten().find(|i| i["id"] == "window.toggle.agent").cloned().unwrap_or_else(|| panic!("no Window › Agent item: {items}"));
         assert_eq!(agent["checked"], false);
         assert_eq!(agent["label"], "Agent");
+        assert_eq!(agent["enabled"], true);
+    }
+
+    #[test]
+    fn the_panel_is_on_by_default_also_for_layouts_saved_before_it() {
+        assert!(crate::state::Panels::default().agent);
+        let mut saved = serde_json::to_value(crate::state::Panels::default()).unwrap();
+        saved.as_object_mut().unwrap().remove("agent");
+        let p: crate::state::Panels = serde_json::from_value(saved).unwrap();
+        assert!(p.agent, "a layout saved before the panel existed shows it");
+    }
+
+    #[test]
+    fn without_an_agent_host_the_menu_item_is_greyed() {
+        let app = app();
+        assert!(!crate::menus::is_enabled(&app, "window.toggle.agent"));
+        assert!(crate::menus::is_enabled(&desktop_app(), "window.toggle.agent"));
     }
 
     /// The panel is drawn on the dock's outer side; collapsed it is a narrow strip.
     #[test]
     fn the_panel_is_drawn_outermost_and_collapses_to_a_strip() {
         use egui_kittest::Harness;
-        let mut app = app();
-        app.ui.panels.agent = true;
+        let mut app = desktop_app();
+        assert!(app.ui.panels.agent, "shown by default");
         app.ui.agent.transcript.push(Entry::Assistant { text: "Hello".into() });
         app.ui.agent.transcript.push(Entry::Tool { name: "layer_new_layer".into(), input: "{}".into(), result: Some(ToolResultView { ok: true, summary: "ok".into(), png: None }) });
         let mut h = Harness::builder().with_size(egui::vec2(1200.0, 700.0)).build_ui_state(
@@ -658,6 +687,12 @@ mod tests {
         assert!(rect.width() <= COLLAPSED_WIDTH + 1.0, "{rect:?}");
 
         h.state_mut().ui.panels.agent = false;
+        h.run_steps(3);
+        assert!(last_rect(&h.ctx).is_none());
+
+        // Without an agent host (the web build) nothing is drawn, whatever the flag says.
+        h.state_mut().ui.panels.agent = true;
+        h.state_mut().services.agent_host = None;
         h.run_steps(3);
         assert!(last_rect(&h.ctx).is_none());
     }

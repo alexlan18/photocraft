@@ -336,7 +336,8 @@ reports events the panel draws (`crates/ui-egui/src/agent_ui.rs`).
 Setup: Edit › Preferences › AI Integrations (model, effort, API key, endpoint, tool rounds per
 message), or export `ANTHROPIC_API_KEY` before launching; the key preference is stored as entered in
 the settings file, so the environment variable is the better choice on a shared machine. The panel
-opens from Window › Agent (`window.toggle.agent`), Enter sends, Shift+Enter inserts a newline, Stop
+is shown by default (also in layouts saved before it existed); Window › Agent (`window.toggle.agent`)
+hides and shows it, and the strip's chevron collapses it. Enter sends, Shift+Enter inserts a newline, Stop
 ends the turn after the tool in flight, Clear starts a new session with the current Preferences.
 File opens and saves through the agent obey the automation roots given at launch
 (`--automation-read-root` / `--automation-write-root`, or the `PHOTOCRAFT_AUTOMATION_*_ROOT`

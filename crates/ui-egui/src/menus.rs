@@ -691,6 +691,10 @@ pub fn is_enabled(app: &PhotocraftApp, id: &str) -> bool {
     if crate::tool_shortcuts::tool(id).is_some() {
         return true;
     }
+    // Window › Agent needs the desktop app's agent host (none on the web).
+    if id == "window.toggle.agent" {
+        return crate::agent_ui::available(app);
+    }
     if id == "ui.symmetryTransform" {
         return crate::symmetry_ui::can_transform(app);
     }

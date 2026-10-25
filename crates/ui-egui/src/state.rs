@@ -488,8 +488,10 @@ pub struct Panels {
     /// floating window rather than a modal so the canvas stays usable while a gradient is edited.
     #[serde(default)]
     pub gradient_editor: bool,
-    /// Window › Agent: the collapsible Agent panel on the dock's far side (`agent_ui`).
-    #[serde(default)]
+    /// Window › Agent: the collapsible Agent panel on the dock's far side (`agent_ui`). On by
+    /// default, also for layouts saved before the panel existed; drawn only where an agent can
+    /// run (the desktop app).
+    #[serde(default = "yes")]
     pub agent: bool,
 }
 
@@ -514,7 +516,7 @@ impl Default for Panels {
             rail: true,
             menu_bar: true,
             gradient_editor: false,
-            agent: false,
+            agent: true,
         }
     }
 }
