@@ -175,8 +175,11 @@ pub struct ToolCallEvent {
 pub enum AgentEvent {
     /// A one-line status for the panel's footer ("thinking…", "running layer_new_layer").
     Status(String),
-    /// Text the model wrote for the user.
+    /// Text the model wrote for the user, whole.
     AssistantText(String),
+    /// Text the model is writing, as it streams: append `text` to the reply being written, or
+    /// start a new one when `new_block` is set (the first piece of each text block).
+    AssistantDelta { text: String, new_block: bool },
     /// The model called a tool.
     ToolCall(ToolCallEvent),
     /// A tool finished: `ok` false means the tool reported an error (the model sees it too).

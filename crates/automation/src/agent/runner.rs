@@ -223,8 +223,30 @@ impl Runner {
             }
             rounds += 1;
             self.emit(AgentEvent::Status("Thinking…".into()));
-            let reply = match self.client.complete(&self.system, &self.tools, &self.messages) {
+            // Text streams into the panel as it arrives; a Stop is noticed on every event, and a
+            // message typed meanwhile waits for its turn.
+            let mut stop = false;
+            let mut typed: Vec<String> = Vec::new();
+            let streamed = self.client.complete_stream(&self.system, &self.tools, &self.messages, &mut |text, new_block| {
+                if !text.is_empty() {
+                    let _ = self.events.send(AgentEvent::AssistantDelta { text: text.to_string(), new_block });
+                    (self.wake)();
+                }
+                while let Ok(c) = self.commands.try_recv() {
+                    match c {
+                        AgentCommand::Cancel => stop = true,
+                        AgentCommand::Send(t) => typed.push(t),
+                    }
+                }
+                !stop
+            });
+            for t in typed {
+                queued.insert(0, t);
+            }
+            let reply = match streamed {
                 Ok(r) => r,
+                // The half-written reply is dropped; what the tools did so far stays.
+                Err(e) if e == llm::STOPPED => break Some("stopped".to_string()),
                 Err(e) => {
                     // The failed exchange leaves no trace: the user can resend.
                     self.messages.truncate(start);
@@ -235,19 +257,10 @@ impl Runner {
             };
             input_tokens = input_tokens.saturating_add(reply.input_tokens);
             output_tokens = output_tokens.saturating_add(reply.output_tokens);
-            for block in &reply.content {
-                match block.get("type").and_then(Value::as_str) {
-                    Some("text") => {
-                        if let Some(t) = block.get("text").and_then(Value::as_str).filter(|t| !t.trim().is_empty()) {
-                            self.emit(AgentEvent::AssistantText(t.to_string()));
-                        }
-                    }
-                    Some("server_tool_use") => {
-                        let what = block.pointer("/input/pattern").or_else(|| block.pointer("/input/query")).and_then(Value::as_str).unwrap_or("");
-                        self.emit(AgentEvent::Status(format!("Searching tools: {}", bounded(what, 80))));
-                    }
-                    _ => {}
-                }
+            // Text has already streamed into the panel; tool searches show in the status line.
+            for block in reply.content.iter().filter(|b| b.get("type").and_then(Value::as_str) == Some("server_tool_use")) {
+                let what = block.pointer("/input/pattern").or_else(|| block.pointer("/input/query")).and_then(Value::as_str).unwrap_or("");
+                self.emit(AgentEvent::Status(format!("Searching tools: {}", bounded(what, 80))));
             }
             // The reply goes back verbatim (thinking, search results and all).
             self.messages.push(json!({"role": "assistant", "content": reply.content}));
@@ -425,7 +438,7 @@ mod tests {
         let calls: Vec<&str> = events.iter().filter_map(|e| if let AgentEvent::ToolCall(c) = e { Some(c.name.as_str()) } else { None }).collect();
         assert_eq!(calls, ["doc_new", "layer_new_layer"], "{events:?}");
         assert!(events.iter().any(|e| matches!(e, AgentEvent::ToolResult { name, ok: true, .. } if name == "layer_new_layer")), "{events:?}");
-        assert!(events.iter().any(|e| matches!(e, AgentEvent::AssistantText(t) if t.starts_with("Done"))));
+        assert!(events.iter().any(|e| matches!(e, AgentEvent::AssistantDelta { text, .. } if text.starts_with("Done"))));
         assert!(matches!(events.last(), Some(AgentEvent::TurnDone { stopped: None, input_tokens: 30, output_tokens: 15 })), "{:?}", events.last());
         // Each event is sent, then the UI woken: the last wake may still be on its way.
         assert!(wakes.load(Ordering::Relaxed) + 1 >= events.len());
@@ -480,7 +493,7 @@ mod tests {
         assert!(events.iter().any(|e| matches!(e, AgentEvent::Error(m) if m.contains("401"))), "{events:?}");
         handle.commands.send(AgentCommand::Send("two".into())).unwrap();
         let events = drain(&handle, is_done);
-        assert!(events.iter().any(|e| matches!(e, AgentEvent::AssistantText(t) if t == "hello")), "{events:?}");
+        assert!(events.iter().any(|e| matches!(e, AgentEvent::AssistantDelta { text, .. } if text == "hello")), "{events:?}");
         let reqs = requests.lock().unwrap();
         let msgs = reqs[1]["messages"].as_array().unwrap();
         assert_eq!(msgs.len(), 1, "the failed exchange left nothing behind: {msgs:?}");
@@ -515,7 +528,7 @@ mod tests {
         // The next message continues from the merged user turn.
         handle.commands.send(AgentCommand::Send("more".into())).unwrap();
         let events = drain(&handle, is_done);
-        assert!(events.iter().any(|e| matches!(e, AgentEvent::AssistantText(t) if t == "after")), "{events:?}");
+        assert!(events.iter().any(|e| matches!(e, AgentEvent::AssistantDelta { text, .. } if text == "after")), "{events:?}");
         let reqs = requests.lock().unwrap();
         let last_user = &reqs[1]["messages"][2]["content"];
         assert_eq!(last_user.as_array().unwrap().len(), 3, "two results and the new text in one user message: {last_user}");
@@ -582,7 +595,7 @@ mod tests {
         handle.commands.send(AgentCommand::Send("new doc".into())).unwrap();
         let events = drain(&handle, |e| matches!(e, AgentEvent::TurnDone { .. }));
         assert!(events.iter().any(|e| matches!(e, AgentEvent::ToolResult { name, ok: true, .. } if name == "doc_new")), "{events:?}");
-        assert!(events.iter().any(|e| matches!(e, AgentEvent::AssistantText(t) if t == "Made it.")));
+        assert!(events.iter().any(|e| matches!(e, AgentEvent::AssistantDelta { text, .. } if text == "Made it.")));
         let r = requests.lock().unwrap();
         // Chat Completions shape: system first, functions only (no deferred tools), and the tool
         // result as a `tool` message after the assistant's call.

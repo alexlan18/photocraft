@@ -53,6 +53,9 @@ pub struct AgentPanelState {
     /// Scroll to the end on the next frame (a new entry arrived).
     #[serde(skip)]
     pub follow: bool,
+    /// The last transcript entry is a reply still streaming in: deltas extend it.
+    #[serde(skip)]
+    pub streaming: bool,
 }
 
 /// One row of the transcript.
@@ -182,8 +185,21 @@ pub fn poll(app: &mut PhotocraftApp) {
 /// One event into the transcript (also the seam tests drive).
 pub fn apply(app: &mut PhotocraftApp, e: AgentEvent) {
     let s = &mut app.ui.agent;
+    // Anything but a status line or another delta ends the reply that was streaming in.
+    let streaming = std::mem::take(&mut s.streaming);
     match e {
-        AgentEvent::Status(text) => s.status = text,
+        AgentEvent::Status(text) => {
+            s.status = text;
+            s.streaming = streaming;
+        }
+        AgentEvent::AssistantDelta { text, new_block } => {
+            match s.transcript.last_mut() {
+                Some(Entry::Assistant { text: shown }) if streaming && !new_block => shown.push_str(&text),
+                _ => push(s, Entry::Assistant { text }),
+            }
+            s.streaming = true;
+            s.follow = true;
+        }
         AgentEvent::AssistantText(text) => push(s, Entry::Assistant { text }),
         AgentEvent::ToolCall(call) => push(s, Entry::Tool { name: call.name, input: call.input, result: None }),
         AgentEvent::ToolResult { name, ok, summary, png } => {
@@ -559,6 +575,21 @@ mod tests {
         let mut app = app();
         app.services.agent_host = Some(Box::new(|_| Err("no sessions in tests".into())));
         app
+    }
+
+    #[test]
+    fn streamed_text_grows_one_reply_per_block() {
+        let mut app = app();
+        let delta = |t: &str, new_block: bool| AgentEvent::AssistantDelta { text: t.into(), new_block };
+        apply(&mut app, delta("Brigh", true));
+        apply(&mut app, AgentEvent::Status("Thinking…".into()));
+        apply(&mut app, delta("tening.", false));
+        apply(&mut app, delta("Second block", true));
+        apply(&mut app, AgentEvent::ToolCall(photocraft_engine::agent::ToolCallEvent { name: "x".into(), input: "{}".into() }));
+        // After a tool call, even a continuation starts a new reply.
+        apply(&mut app, delta("After", false));
+        let texts: Vec<&str> = app.ui.agent.transcript.iter().filter_map(|e| if let Entry::Assistant { text } = e { Some(text.as_str()) } else { None }).collect();
+        assert_eq!(texts, ["Brightening.", "Second block", "After"]);
     }
 
     #[test]

@@ -331,7 +331,13 @@ control channel and the frame loop answers them, so the agent gets the bridge-mo
 without a socket. The runner (`crates/automation/src/agent/`) calls the Claude Messages API over
 HTTPS with the built-in tools loaded and the ~940 per-command tools deferred behind the API's tool
 search, keeps the conversation append-only (prompt caching on the system prompt and the tools), and
-reports events the panel draws (`crates/ui-egui/src/agent_ui.rs`).
+reports events the panel draws (`crates/ui-egui/src/agent_ui.rs`). Replies stream: the request asks
+for server-sent events (`"stream": true`; OpenAI-compatible also `stream_options.include_usage`,
+dropped if the server refuses it), text deltas reach the panel as `AgentEvent::AssistantDelta` and
+grow the reply being written, and `llm.rs` (`AnthropicStream`, `OpenAiStream`) puts the full reply
+back together (tool inputs from their JSON deltas) so the history is the same as without
+streaming. Stop is noticed on every streamed event; the half-written reply is dropped. A request is
+retried only while nothing has been shown; a server that ignores `stream` is read whole.
 
 Setup: Edit › Preferences › AI Integrations (API format, model, effort, API key, endpoint, tool
 rounds per message), or export `ANTHROPIC_API_KEY` before launching. **Test Model** sends one short
