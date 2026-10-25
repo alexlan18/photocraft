@@ -112,6 +112,43 @@ async fn lists_expected_tools() {
     client.cancel().await.unwrap();
 }
 
+/// Every engine command is its own tool too (`server/command_tools.rs`): named after the id
+/// with underscores, described with the label, menu path and parameter doc, and run with the
+/// arguments as the command's params.
+#[tokio::test(flavor = "multi_thread")]
+async fn every_engine_command_is_a_tool() {
+    let client = connect(PhotocraftMcp::headless()).await;
+    let tools = client.list_all_tools().await.unwrap();
+    let names: std::collections::HashSet<String> = tools.iter().map(|t| t.name.to_string()).collect();
+    assert_eq!(names.len(), tools.len(), "duplicate tool names");
+    for c in photocraft_engine::commands::command_specs() {
+        let name = photocraft_automation::server::command_tools::tool_name(c.id);
+        assert!(names.contains(&name), "no tool for command {}", c.id);
+    }
+    let blur = tools.iter().find(|t| t.name == "filter_blur_gaussianBlur").expect("filter_blur_gaussianBlur");
+    let d = blur.description.as_deref().unwrap_or("");
+    assert!(d.contains("Gaussian Blur") && d.contains("filter.blur.gaussianBlur") && d.contains("radius"), "{d}");
+    assert_eq!(blur.input_schema.get("type"), Some(&json!("object")));
+    assert_eq!(blur.annotations.as_ref().and_then(|a| a.read_only_hint), Some(false));
+    let list = tools.iter().find(|t| t.name == "command_list").expect("command_list");
+    assert!(list.input_schema.get("properties").and_then(Value::as_object).is_some_and(|p| p.contains_key("filter")), "the built-in command_list keeps its schema");
+
+    // A command tool edits like command_run does: one history step, the command's result.
+    let r = call(&client, "doc_new", json!({"width": 16, "height": 16})).await;
+    assert_ne!(r.is_error, Some(true), "{}", text(&r));
+    let r = call(&client, "layer_new_layer", json!({"name": "Via tool"})).await;
+    assert_ne!(r.is_error, Some(true), "{}", text(&r));
+    let doc = json_of(&call(&client, "doc_inspect", json!({})).await);
+    let names: Vec<&str> = doc["layers"].as_array().unwrap().iter().filter_map(|l| l["name"].as_str()).collect();
+    assert!(names.contains(&"Via tool"), "{names:?}");
+    // Bad params are an error result, not a transport failure; unknown tools too.
+    let r = call(&client, "filter_blur_gaussianBlur", json!({"radius": "wide"})).await;
+    assert_eq!(r.is_error, Some(true), "{}", text(&r));
+    let r = client.call_tool(CallToolRequestParams::new("filter_blur_noSuchFilter".to_owned())).await;
+    assert!(r.is_err() || r.is_ok_and(|r| r.is_error == Some(true)));
+    client.cancel().await.unwrap();
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn headless_edit_render_save_roundtrip() {
     let dir = tmp("edit");

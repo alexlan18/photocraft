@@ -294,6 +294,7 @@ Headless and web sessions without a release transport report `supported: false`.
 
 Set `general.automaticallyCheckUpdates` with `prefs.set` to enable or disable the next
 desktop startup's single check (enabled by default). Manual checks still work when automatic checks are off.
+`ui.inspect` includes `agent` (the Agent panel, see [MCP bridge](#mcp-bridge)); `ui.set {"agentPanel": true}` shows it.
 `ui.inspect` includes `updates` and `updatesOpen`; `ui.set {"updatesOpen": false}` closes
 the non-modal update window.
 
@@ -351,6 +352,31 @@ How each MCP tool maps onto control methods in bridge mode:
 Bridge previews capture the app window; passing `index` is an error. Headless `doc_render_preview` supports `index` without changing the active document.
 
 `doc_select` and `doc_close` work only in headless mode. The `ui_*` tools and `control_call` work only in bridge mode; in headless mode they return a tool error that explains how to start bridge mode.
+
+**One tool per command.** Besides the built-in tools, the server lists every engine command as
+its own tool, named after the command id with dots replaced by underscores
+(`filter_blur_gaussianBlur` runs `filter.blur.gaussianBlur`, `layer_new_layer` runs
+`layer.new.layer`). The tool's arguments are the command's params, so the call is the same as
+`command_run {id, params}` (one history step, the command's JSON result, `wait` true) and maps to
+`engine.execute` in bridge mode. The description carries the label, the menu path, the shortcut
+and the command's parameter doc (`{name: type = default}`, `?` for optional), which tool search
+indexes; the input schema accepts any object (the parameter docs are prose, not schemas). A
+command whose derived name is also a built-in tool's name (`command.list` → `command_list`,
+`jobs.list`, `jobs.cancel`) keeps the built-in. `crates/automation/src/server/command_tools.rs`.
+
+**In-app Agent panel (local backend).** Window › Agent opens a collapsible panel on the dock's
+outer side where the user talks to an agent that edits the open document. The desktop app runs the
+same MCP server in process with a third backend, `Backend::Local`: tool calls go into the app's
+control-request queue (the one the `--control` socket feeds) and the frame loop answers them, so
+the agent has exactly the bridge-mode tool surface, including `ui_screenshot`, with no socket and
+no token. The model (Claude, over the Messages API; Preferences › AI Integrations holds the model,
+effort, key and endpoint) sees the built-in tools up front and the per-command tools behind the
+API's tool search (`defer_loading`). The shell exposes the panel to automation: `ui.set
+{agentPanel: bool}` shows or hides it, and `ui.inspect` reports `agent` (`open`, `collapsed`,
+`available`, `busy`, `status`, `draft`, `tokens`, `session`, `transcript`: user, assistant, tool,
+error and note rows). File tools in the panel are subject to the same automation roots as the
+socket. `crates/automation/src/agent/`, `crates/ui-egui/src/agent_ui.rs`,
+`apps/photocraft/src/agent_host.rs`.
 
 **Security note:** TCP control uses a bearer token, not client identity or general per-method
 authorization. A client that possesses the token receives the non-filesystem control surface,

@@ -29,6 +29,7 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
+mod agent_host;
 mod app_dirs;
 mod app_icon;
 mod appearance;
@@ -505,10 +506,14 @@ fn main() -> eframe::Result {
                     log::warn!("couldn't remember GPU backend {}: {e}", b.name());
                 }
             });
+            // One control queue: the `--control` socket (if any) and the Agent panel's
+            // in-process MCP server both feed it; the frame loop answers.
+            let (control_tx, control_rx) = std::sync::mpsc::channel();
+            app = app.with_control(control_rx);
             if let Some((port, token, _)) = control {
-                let rx = control_server::start(port, token, cc.egui_ctx.clone());
-                app = app.with_control(rx);
+                control_server::start(port, token, cc.egui_ctx.clone(), control_tx.clone());
             }
+            app.services.agent_host = Some(agent_host::host(control_tx, cc.egui_ctx.clone()));
             #[cfg(target_os = "macos")]
             {
                 app.services.os_events = Some(apple_events.connect(&cc.egui_ctx));

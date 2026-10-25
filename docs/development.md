@@ -313,8 +313,39 @@ screenshot. `crates/automation/tests/it/agent_tasks.rs` is the reference: ten re
 (title card, colour grade, undo/redo, editable smart blur, masks, saved selections, align,
 capability-scoped export, resize/crop, CMYK + native save) driven purely over MCP.
 
+Every engine command is also its own MCP tool, named after its id with underscores
+(`filter_blur_gaussianBlur`, `layer_new_layer`); its arguments are the command's params, its
+description the label, menu path and parameter doc. `command_list` / `command_run` remain for
+discovery by text and for `wait: false` jobs. See `docs/control-protocol.md` › MCP bridge.
+
 Without MCP, `photocraft-cli serve [--port N]` keeps a headless session open and answers JSON lines
 (see `docs/control-protocol.md#headless-server`).
+
+### Agent panel (Window › Agent)
+
+The desktop app has a built-in agent: a collapsible panel on the far right where the user asks for
+edits in words ("brighten the shadows and add a vignette") and watches the agent carry them out
+through PhotoCraft's own MCP tools, every call and screenshot listed in the transcript. It is the
+MCP server above with a third, in-process backend (`Backend::Local`): tool calls queue on the app's
+control channel and the frame loop answers them, so the agent gets the bridge-mode tool surface
+without a socket. The runner (`crates/automation/src/agent/`) calls the Claude Messages API over
+HTTPS with the built-in tools loaded and the ~940 per-command tools deferred behind the API's tool
+search, keeps the conversation append-only (prompt caching on the system prompt and the tools), and
+reports events the panel draws (`crates/ui-egui/src/agent_ui.rs`).
+
+Setup: Edit › Preferences › AI Integrations (model, effort, API key, endpoint, tool rounds per
+message), or export `ANTHROPIC_API_KEY` before launching; the key preference is stored as entered in
+the settings file, so the environment variable is the better choice on a shared machine. The panel
+opens from Window › Agent (`window.toggle.agent`), Enter sends, Shift+Enter inserts a newline, Stop
+ends the turn after the tool in flight, Clear starts a new session with the current Preferences.
+File opens and saves through the agent obey the automation roots given at launch
+(`--automation-read-root` / `--automation-write-root`, or the `PHOTOCRAFT_AUTOMATION_*_ROOT`
+variables); without them the agent asks the user to use the File menu. The web build has no agent
+(no HTTPS client or threads): the panel says so.
+
+Driving it from tests or the control channel: `ui.set {agentPanel: true}` and `ui.inspect` → `agent`
+(the transcript included). The runner is tested with scripted model replies against the headless
+backend (`agent/runner.rs` tests); the live API is never contacted by tests.
 
 A typical agent loop (place inputs under the configured read root and outputs under the write root):
 

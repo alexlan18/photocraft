@@ -6,7 +6,7 @@ use rmcp::service::RequestContext;
 
 const DOCUMENT: &str = "photocraft://document";
 const COMMANDS: &str = "photocraft://commands";
-const INSTRUCTIONS: &str = "PhotoCraft image editor. Start with doc_new/doc_open, discover ids and parameter docs with command_list, edit with command_run or command_batch (one history step per command). Inspect with doc_inspect and render_preview; doc_save writes native .pcraft or exports by extension. File paths are relative to the read/write roots granted at launch. ui_inspect/ui_screenshot and other ui_* tools require bridge mode. Read photocraft://document and photocraft://commands for live JSON state.";
+const INSTRUCTIONS: &str = "PhotoCraft image editor. Start with doc_new/doc_open, discover ids and parameter docs with command_list, edit with command_run or command_batch (one history step per command). Every engine command is also its own tool, named after its id with underscores (filter_blur_gaussianBlur runs filter.blur.gaussianBlur with the arguments as its params). Inspect with doc_inspect and render_preview; doc_save writes native .pcraft or exports by extension. File paths are relative to the read/write roots granted at launch. ui_inspect/ui_screenshot and other ui_* tools require bridge mode or the app's own Agent panel. Read photocraft://document and photocraft://commands for live JSON state.";
 
 fn annotated(mut tool: Tool) -> Tool {
     let words = tool.name.replace('_', " ");
@@ -31,12 +31,19 @@ impl ServerHandler for PhotocraftMcp {
     }
 
     async fn list_tools(&self, _: Option<PaginatedRequestParams>, _: RequestContext<RoleServer>) -> Result<ListToolsResult, McpError> {
-        let tools: Vec<_> = self.tool_router.list_all().into_iter().map(annotated).collect();
+        let mut tools: Vec<_> = self.tool_router.list_all().into_iter().map(annotated).collect();
+        tools.extend(self.command_tools.tools().iter().cloned());
         serde_json::from_value(json!({"resultType":"complete", "ttlMs":600000, "cacheScope":"private", "tools":tools}))
             .map_err(|e| McpError::internal_error(e.to_string(), None))
     }
 
     async fn call_tool(&self, request: CallToolRequestParams, context: RequestContext<RoleServer>) -> Result<CallToolResponse, McpError> {
+        if !self.tool_router.has_route(&request.name)
+            && let Some(command) = self.command_tools.command(&request.name)
+        {
+            let params = Value::Object(request.arguments.clone().unwrap_or_default());
+            return Ok(self.run_command(command.id.to_string(), params, true).await?.into());
+        }
         if let Some(tool) = self.tool_router.get(&request.name) {
             let properties = tool.input_schema.get("properties").and_then(Value::as_object);
             if let Some(args) = &request.arguments

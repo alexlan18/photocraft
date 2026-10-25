@@ -16,6 +16,7 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
+pub mod agent;
 pub mod args;
 pub mod bridge;
 pub mod budgets;
@@ -28,7 +29,7 @@ pub mod workspace;
 
 pub use bridge::BridgeClient;
 pub use headless::Headless;
-pub use server::{Backend, PhotocraftMcp};
+pub use server::{Backend, LocalControl, PhotocraftMcp};
 pub use workspace::AuthorizedWorkspace;
 
 #[derive(Debug, thiserror::Error)]

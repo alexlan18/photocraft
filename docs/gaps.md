@@ -183,6 +183,11 @@ what an agent can't finish alone.
 - **Estimate:** 120–200 h.
 
 ### G15. AI and generative features
+
+*2026-10-25:* the desktop app gained an in-app agent (Window › Agent: a Claude client driving the
+app through its own MCP tools, every engine command being a tool; `docs/development.md` › Agent
+panel). It is an agentic front end over the classical toolset, not a generative feature, so the
+dimension's number is unchanged; it does make every generative substitute reachable in words.
 - **Missing:** Generative Fill and Expand, Generative Upscale, Neural Filters, Sky Replacement,
   Super Zoom, ML Select Subject/Sky. There is no ML runtime (AUTO-219-7). Classical substitutes
   exist (GrabCut/max-flow selection, Remove tool by non-local patch completion).

@@ -4382,3 +4382,20 @@ navigator	Zoom	Zoom
 	Grayscale Ramp	Rampa de escala de grises
 	Current Colors	Colores actuales
 	Make Ramp Web Safe	Hacer rampa segura para web
+	Agent	Agente
+	Agent settings (Preferences › AI Integrations)	Ajustes del agente (Preferencias › Integraciones de IA)
+	Clear conversation	Borrar conversación
+	Thinking…	Pensando…
+	Stopping…	Deteniendo…
+	The agent needs the desktop app.	El agente necesita la aplicación de escritorio.
+	Describe an edit, for example “brighten the shadows and add a vignette”. The agent uses PhotoCraft's own commands and shows every step here.	Describe una edición, por ejemplo «aclarar las sombras y añadir un viñeteado». El agente usa los comandos de PhotoCraft y muestra aquí cada paso.
+	Ask the agent to edit the image…	Pide al agente que edite la imagen…
+	Send	Enviar
+	Enter to send, Shift+Enter for a new line	Intro para enviar, Mayús+Intro para una nueva línea
+	Tokens: {in} in, {out} out	Tokens: {in} de entrada, {out} de salida
+	Agent model	Modelo del agente
+	Agent effort	Esfuerzo del agente
+	Agent API key	Clave de API del agente
+	Agent API endpoint	Punto de conexión de API del agente
+	Agent tool rounds per message	Rondas de herramientas del agente por mensaje
+	Agent refusal fallbacks	Modelos alternativos del agente ante rechazos

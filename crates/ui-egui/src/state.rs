@@ -488,6 +488,9 @@ pub struct Panels {
     /// floating window rather than a modal so the canvas stays usable while a gradient is edited.
     #[serde(default)]
     pub gradient_editor: bool,
+    /// Window › Agent: the collapsible Agent panel on the dock's far side (`agent_ui`).
+    #[serde(default)]
+    pub agent: bool,
 }
 
 impl Default for Panels {
@@ -511,6 +514,7 @@ impl Default for Panels {
             rail: true,
             menu_bar: true,
             gradient_editor: false,
+            agent: false,
         }
     }
 }
@@ -1603,6 +1607,9 @@ pub struct UiState {
     /// Non-modal release-check window; readable and controllable through `ui.inspect`/`ui.set`.
     #[serde(default)]
     pub updates_open: bool,
+    /// The Agent panel's conversation and draft (`agent_ui`).
+    #[serde(default)]
+    pub agent: crate::agent_ui::AgentPanelState,
     /// Pending GPU fallback warning, visible to automation.
     #[serde(default)]
     pub gpu_fallback_notice: Option<String>,
@@ -1709,6 +1716,7 @@ impl Default for UiState {
             status_error: false,
             notices: Vec::new(),
             updates_open: false,
+            agent: Default::default(),
             gpu_fallback_notice: None,
             kys_offer: None,
             slow_refresh_noticed: Vec::new(),

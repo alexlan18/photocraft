@@ -4623,3 +4623,20 @@ shape	Appearance	Оформление
 	Grayscale Ramp	Шкала градаций серого
 	Current Colors	Текущие цвета
 	Make Ramp Web Safe	Сделать шкалу безопасной для web
+	Agent	Агент
+	Agent settings (Preferences › AI Integrations)	Настройки агента (Установки › Интеграции ИИ)
+	Clear conversation	Очистить разговор
+	Thinking…	Думает…
+	Stopping…	Остановка…
+	The agent needs the desktop app.	Агенту нужно настольное приложение.
+	Describe an edit, for example “brighten the shadows and add a vignette”. The agent uses PhotoCraft's own commands and shows every step here.	Опишите правку, например «осветлить тени и добавить виньетку». Агент использует команды PhotoCraft и показывает здесь каждый шаг.
+	Ask the agent to edit the image…	Попросите агента отредактировать изображение…
+	Send	Отправить
+	Enter to send, Shift+Enter for a new line	Enter — отправить, Shift+Enter — новая строка
+	Tokens: {in} in, {out} out	Токены: {in} на входе, {out} на выходе
+	Agent model	Модель агента
+	Agent effort	Уровень усилий агента
+	Agent API key	Ключ API агента
+	Agent API endpoint	Конечная точка API агента
+	Agent tool rounds per message	Раундов инструментов агента на сообщение
+	Agent refusal fallbacks	Запасные модели агента при отказе

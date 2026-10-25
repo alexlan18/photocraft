@@ -1731,6 +1731,8 @@ pub fn status_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 // ----------------------------------------------------------------------------- dock
 
 pub fn right_dock(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+    // The Agent panel sits outside the dock, on the window's edge (Window › Agent).
+    crate::agent_ui::side_panel(app, ui);
     // Even legacy destinations must discard gestures captured by an earlier workspace.
     let customized = crate::panel_docking::show(app, ui);
     let t = Tokens::get(ui.ctx());

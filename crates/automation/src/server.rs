@@ -25,12 +25,54 @@ pub enum Backend {
     Headless(Arc<Mutex<Headless>>),
     /// A running desktop app reached over the control protocol.
     Bridge(Arc<BridgeClient>),
+    /// The desktop app this server runs inside, reached through its control-request queue
+    /// (the Agent panel): the same methods as the bridge, with no socket.
+    Local(Arc<dyn LocalControl>),
+}
+
+/// A control-protocol endpoint in the same process: the desktop app implements it by queueing
+/// the request for its frame loop and waiting for the reply. Called from a blocking task, never
+/// from the UI thread (the UI thread answers it).
+pub trait LocalControl: Send + Sync {
+    /// Run `method` with `params`; `Ok` is the reply's `result`, `Err` its `error`.
+    fn call(&self, method: &str, params: Value) -> Result<Value, AutomationError>;
+}
+
+/// A running app, over TCP or in process: what the bridge-mode tools talk to.
+pub(crate) enum Remote<'a> {
+    Bridge(&'a BridgeClient),
+    Local(&'a Arc<dyn LocalControl>),
+}
+
+impl Remote<'_> {
+    pub(crate) async fn call(&self, method: &str, params: Value) -> Result<Value, AutomationError> {
+        match self {
+            Remote::Bridge(b) => b.call(method, params).await,
+            Remote::Local(l) => local_call(l, method, params).await,
+        }
+    }
+
+    /// [`Self::call`] for a method that only reads state (the bridge retries it once).
+    pub(crate) async fn call_read(&self, method: &str, params: Value) -> Result<Value, AutomationError> {
+        match self {
+            Remote::Bridge(b) => b.call_read(method, params).await,
+            Remote::Local(l) => local_call(l, method, params).await,
+        }
+    }
+}
+
+async fn local_call(l: &Arc<dyn LocalControl>, method: &str, params: Value) -> Result<Value, AutomationError> {
+    let l = Arc::clone(l);
+    let method = method.to_string();
+    tokio::task::spawn_blocking(move || l.call(&method, params)).await.unwrap_or_else(|e| Err(AutomationError::Other(format!("task failed: {e}"))))
 }
 
 #[derive(Clone)]
 pub struct PhotocraftMcp {
     backend: Arc<Backend>,
     tool_router: ToolRouter<Self>,
+    /// One tool per engine command (`server/command_tools.rs`).
+    command_tools: Arc<command_tools::CommandTools>,
 }
 
 // ---------------------------------------------------------------------------
@@ -500,6 +542,11 @@ impl PhotocraftMcp {
         Ok(Self::with_backend(Backend::Bridge(Arc::new(BridgeClient::new(addr, token)?))))
     }
 
+    /// In-process: the tools reach the app that hosts this server through `control`.
+    pub fn local(control: Arc<dyn LocalControl>) -> Self {
+        Self::with_backend(Backend::Local(control))
+    }
+
     pub fn with_backend(backend: Backend) -> Self {
         let mut tool_router = Self::tool_router();
         for route in tool_router.map.values_mut() {
@@ -507,7 +554,18 @@ impl PhotocraftMcp {
             strict_schema(&mut schema);
             route.attr.input_schema = Arc::new(schema);
         }
-        PhotocraftMcp { backend: Arc::new(backend), tool_router }
+        let command_tools = Arc::new(command_tools::CommandTools::new(|name| tool_router.has_route(name)));
+        PhotocraftMcp { backend: Arc::new(backend), tool_router, command_tools }
+    }
+
+    /// The per-command tools this server lists besides its built-in ones.
+    pub fn command_tool_count(&self) -> usize {
+        self.command_tools.len()
+    }
+
+    /// Whether `name` is one of the per-command tools (as opposed to a built-in one).
+    pub fn is_command_tool(&self, name: &str) -> bool {
+        self.command_tools.command(name).is_some()
     }
 
     /// Serve MCP over stdin/stdout until the client disconnects.
@@ -538,14 +596,15 @@ impl PhotocraftMcp {
         )
     }
 
-    fn bridge_client(&self) -> Option<&BridgeClient> {
+    fn remote(&self) -> Option<Remote<'_>> {
         match &*self.backend {
-            Backend::Bridge(b) => Some(b),
+            Backend::Bridge(b) => Some(Remote::Bridge(b)),
+            Backend::Local(l) => Some(Remote::Local(l)),
             Backend::Headless(_) => None,
         }
     }
 
-    async fn screenshot(&self, b: &BridgeClient, max_side: Option<u32>) -> Result<CallToolResult, McpError> {
+    async fn screenshot(&self, b: &Remote<'_>, max_side: Option<u32>) -> Result<CallToolResult, McpError> {
         if max_side.is_some_and(|side| side > MAX_PREVIEW_SIDE) {
             return Ok(fail(format!("automation preview side exceeds {MAX_PREVIEW_SIDE} pixels")));
         }
@@ -614,7 +673,7 @@ impl PhotocraftMcp {
         if let Some(r) = self.headless_op(|h| Ok(h.session_list())).await {
             return to_result(r);
         }
-        let Some(b) = self.bridge_client() else {
+        let Some(b) = self.remote() else {
             return Ok(no_backend());
         };
         to_result(b.call_read("ui.inspect", json!({})).await)
@@ -626,7 +685,7 @@ impl PhotocraftMcp {
         if let Some(r) = self.headless_op(move |h| h.open(&path)).await {
             return to_result(r);
         }
-        let Some(b) = self.bridge_client() else {
+        let Some(b) = self.remote() else {
             return Ok(no_backend());
         };
         to_result(b.call("app.open", json!({"path": p.path})).await)
@@ -811,7 +870,7 @@ impl PhotocraftMcp {
         {
             return to_result(r);
         }
-        let Some(b) = self.bridge_client() else {
+        let Some(b) = self.remote() else {
             return Ok(no_backend());
         };
         let params = p.index.map(|index| json!({"document": index})).unwrap_or_else(|| json!({}));
@@ -827,13 +886,13 @@ impl PhotocraftMcp {
                 Err(e) => fail(e),
             });
         }
-        let Some(b) = self.bridge_client() else {
+        let Some(b) = self.remote() else {
             return Ok(no_backend());
         };
         if p.index.is_some() {
             return Ok(fail("`index` is only supported in headless mode; bridge previews capture the app window"));
         }
-        self.screenshot(b, Some(max)).await
+        self.screenshot(&b, Some(max)).await
     }
 
     #[tool(description = "Render a bounded flattened PNG preview (bridge mode: app window screenshot).")]
@@ -865,7 +924,7 @@ impl PhotocraftMcp {
         let all = if let Some(r) = self.headless_op(|h| Ok(h.command_list())).await {
             r
         } else {
-            let Some(b) = self.bridge_client() else {
+            let Some(b) = self.remote() else {
                 return Ok(no_backend());
             };
             b.call_read("engine.commands", json!({})).await
@@ -920,7 +979,7 @@ impl PhotocraftMcp {
         if let Some(r) = self.headless_op(move |h| h.batch_with_budget(&args, BatchReplyBudget::escaped())).await {
             return to_result(r);
         }
-        let Some(b) = self.bridge_client() else {
+        let Some(b) = self.remote() else {
             return Ok(no_backend());
         };
         let mut results = Vec::new();
@@ -955,7 +1014,7 @@ impl PhotocraftMcp {
         description = "Bridge mode: full UI state of the live app (tool, panels, views, dialogs, windows). For the menu tree, call `control_call` with method `ui.menu.list`."
     )]
     async fn ui_inspect(&self) -> Result<CallToolResult, McpError> {
-        match self.bridge_client() {
+        match self.remote() {
             Some(b) => to_result(b.call_read("ui.inspect", json!({})).await),
             None => bridge_only("ui_inspect"),
         }
@@ -963,8 +1022,8 @@ impl PhotocraftMcp {
 
     #[tool(description = "Bridge mode: screenshot of the live app window as PNG.")]
     async fn ui_screenshot(&self, Parameters(p): Parameters<ScreenshotParams>) -> Result<CallToolResult, McpError> {
-        match self.bridge_client() {
-            Some(b) => self.screenshot(b, p.max_side).await,
+        match self.remote() {
+            Some(b) => self.screenshot(&b, p.max_side).await,
             None => bridge_only("ui_screenshot"),
         }
     }
@@ -973,7 +1032,7 @@ impl PhotocraftMcp {
         description = "Bridge mode: send pointer events (document coordinates) to the active tool; with a Color Picker open they sample the image into it instead."
     )]
     async fn ui_pointer(&self, Parameters(p): Parameters<PointerParams>) -> Result<CallToolResult, McpError> {
-        match self.bridge_client() {
+        match self.remote() {
             Some(b) => {
                 let mut params = json!({"events": p.events});
                 if let Some(m) = p.modifiers {
@@ -990,7 +1049,7 @@ impl PhotocraftMcp {
 
     #[tool(description = "Bridge mode: activate a menu item by id.")]
     async fn ui_menu_invoke(&self, Parameters(p): Parameters<MenuParams>) -> Result<CallToolResult, McpError> {
-        match self.bridge_client() {
+        match self.remote() {
             Some(b) => to_result(b.call("ui.menu.invoke", json!({"id": p.id})).await),
             None => bridge_only("ui_menu_invoke"),
         }
@@ -1000,7 +1059,7 @@ impl PhotocraftMcp {
         description = "Bridge mode: change UI state (tool, panels, dock, zoom, center, fit, theme, brush settings; see `fields`). Unknown fields are an error."
     )]
     async fn ui_set(&self, Parameters(p): Parameters<UiSetParams>) -> Result<CallToolResult, McpError> {
-        match self.bridge_client() {
+        match self.remote() {
             Some(b) => to_result(b.call("ui.set", p.fields).await),
             None => bridge_only("ui_set"),
         }
@@ -1008,7 +1067,7 @@ impl PhotocraftMcp {
 
     #[tool(description = "Bridge mode: call any control-protocol method (docs/control-protocol.md) with raw params.")]
     async fn control_call(&self, Parameters(p): Parameters<ControlParams>) -> Result<CallToolResult, McpError> {
-        match self.bridge_client() {
+        match self.remote() {
             Some(b) => to_result(b.call(&p.method, p.params.unwrap_or_else(|| json!({}))).await),
             None => bridge_only("control_call"),
         }
@@ -1025,7 +1084,7 @@ impl PhotocraftMcp {
         if let Some(r) = self.headless_op(move |h| h.command_start(&id2, params2, wait)).await {
             return to_result(r);
         }
-        let Some(b) = self.bridge_client() else {
+        let Some(b) = self.remote() else {
             return Ok(no_backend());
         };
         to_result(b.call("engine.execute", json!({"command": id, "params": params, "wait": wait})).await)
@@ -1037,7 +1096,7 @@ impl PhotocraftMcp {
         if let Some(r) = self.headless_op(move |h| h.command_start(method, p2, true)).await {
             return to_result(r);
         }
-        let Some(b) = self.bridge_client() else {
+        let Some(b) = self.remote() else {
             return Ok(no_backend());
         };
         if read { to_result(b.call_read(method, params).await) } else { to_result(b.call(method, params).await) }
@@ -1062,7 +1121,7 @@ impl PhotocraftMcp {
             Some((_, Some(c))) => Some(c),
             Some((c, None)) => return Ok(fail(format!("`ddsCompression` must be none, bc1, bc2 or bc3, got {c:?}"))),
         };
-        if let Some(b) = self.bridge_client() {
+        if let Some(b) = self.remote() {
             // The bridge forwards to the running app's `app.save`, which takes only an optional
             // path (without one it writes back to the document's own layered file, as headless
             // does), the Targa bits and the DDS options, so the other options are headless-only. Saying so beats
@@ -1116,6 +1175,7 @@ impl PhotocraftMcp {
     }
 }
 
+pub mod command_tools;
 mod conventions;
 mod progress;
 mod transport;

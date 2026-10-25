@@ -4462,3 +4462,20 @@ shape	Appearance	Apparence
 	Grayscale Ramp	Barre de niveaux de gris
 	Current Colors	Couleurs actuelles
 	Make Ramp Web Safe	Limiter la barre aux couleurs Web
+	Agent	Agent
+	Agent settings (Preferences › AI Integrations)	Réglages de l’agent (Préférences › Intégrations IA)
+	Clear conversation	Effacer la conversation
+	Thinking…	Réflexion…
+	Stopping…	Arrêt…
+	The agent needs the desktop app.	L’agent nécessite l’application de bureau.
+	Describe an edit, for example “brighten the shadows and add a vignette”. The agent uses PhotoCraft's own commands and shows every step here.	Décrivez une modification, par exemple « éclaircir les ombres et ajouter un vignettage ». L’agent utilise les commandes de PhotoCraft et affiche chaque étape ici.
+	Ask the agent to edit the image…	Demander à l’agent de modifier l’image…
+	Send	Envoyer
+	Enter to send, Shift+Enter for a new line	Entrée pour envoyer, Maj+Entrée pour un saut de ligne
+	Tokens: {in} in, {out} out	Jetons : {in} en entrée, {out} en sortie
+	Agent model	Modèle de l’agent
+	Agent effort	Effort de l’agent
+	Agent API key	Clé API de l’agent
+	Agent API endpoint	Point de terminaison API de l’agent
+	Agent tool rounds per message	Tours d’outils de l’agent par message
+	Agent refusal fallbacks	Modèles de repli de l’agent en cas de refus

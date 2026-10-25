@@ -4,7 +4,7 @@
 use std::io::{BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::Arc;
-use std::sync::mpsc::{Receiver, Sender, channel};
+use std::sync::mpsc::Sender;
 use std::time::{Duration, Instant};
 
 use photocraft_automation::budgets::write_reply;
@@ -16,13 +16,14 @@ use photocraft_ui_egui::ControlRequest;
 use photocraft_ui_egui::control::REPLY_DEADLINE;
 use serde_json::{Value, json};
 
-pub fn start(port: u16, token: String, ctx: egui::Context) -> Receiver<ControlRequest> {
-    let (tx, rx) = channel::<ControlRequest>();
+/// Serve `port`, queueing requests on `tx` (the app's control queue, shared with the Agent
+/// panel's in-process endpoint).
+pub fn start(port: u16, token: String, ctx: egui::Context, tx: Sender<ControlRequest>) {
     let listener = match TcpListener::bind(("127.0.0.1", port)) {
         Ok(l) => l,
         Err(e) => {
             eprintln!("photocraft: control server failed to bind 127.0.0.1:{port}: {e}");
-            return rx;
+            return;
         }
     };
     eprintln!("photocraft: control server listening on {}", listening_addr(&listener, port));
@@ -44,7 +45,6 @@ pub fn start(port: u16, token: String, ctx: egui::Context) -> Receiver<ControlRe
             });
         }
     });
-    rx
 }
 
 /// The address `listener` is bound to: with `--control 0` the OS picks the port, and a client
@@ -138,6 +138,8 @@ fn serve_with_auth_deadline(stream: TcpStream, token: &str, tx: Sender<ControlRe
 
 #[cfg(test)]
 mod tests {
+    use std::sync::mpsc::channel;
+
     use super::*;
     use std::io::BufRead;
 

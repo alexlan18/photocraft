@@ -4099,3 +4099,20 @@ curves	Smooth	スムーズ
 	Grayscale Ramp	グレースケールランプ
 	Current Colors	現在のカラー
 	Make Ramp Web Safe	ランプを Web セーフにする
+	Agent	エージェント
+	Agent settings (Preferences › AI Integrations)	エージェント設定（環境設定 › AI 連携）
+	Clear conversation	会話を消去
+	Thinking…	考え中…
+	Stopping…	停止しています…
+	The agent needs the desktop app.	エージェントにはデスクトップ版アプリが必要です。
+	Describe an edit, for example “brighten the shadows and add a vignette”. The agent uses PhotoCraft's own commands and shows every step here.	編集内容を説明してください。例：「シャドウを明るくしてビネットを追加」。エージェントは PhotoCraft 自身のコマンドを使い、各ステップをここに表示します。
+	Ask the agent to edit the image…	エージェントに画像の編集を依頼…
+	Send	送信
+	Enter to send, Shift+Enter for a new line	Enter で送信、Shift+Enter で改行
+	Tokens: {in} in, {out} out	トークン：入力 {in}、出力 {out}
+	Agent model	エージェントのモデル
+	Agent effort	エージェントの推論強度
+	Agent API key	エージェントの API キー
+	Agent API endpoint	エージェントの API エンドポイント
+	Agent tool rounds per message	1 メッセージあたりのツール実行ラウンド数
+	Agent refusal fallbacks	エージェントの拒否時フォールバック

@@ -663,6 +663,7 @@ pub(crate) fn invoke_unguarded(app: &mut PhotocraftApp, ctx: &egui::Context, id:
                 "brushSettings" => &mut p.brush_settings,
                 "brushes" => &mut p.brushes,
                 "dock" => &mut p.dock,
+                "agent" => &mut p.agent,
                 _ => return Err(format!("unknown panel in {t}")),
             };
             *slot = !*slot;
@@ -793,6 +794,9 @@ const MODE_CHECKS: [&str; 11] = ["rgb", "grayscale", "cmyk", "lab", "multichanne
 fn checked(app: &PhotocraftApp, id: &str) -> Option<bool> {
     if let Some(checked) = crate::panel_docking::checked(app, id) {
         return Some(checked);
+    }
+    if id == "window.toggle.agent" {
+        return Some(app.ui.panels.agent);
     }
     use photocraft_doc::{ColorMode, SampleType};
     if let Some(name) = id.strip_prefix("window.theme.").filter(|n| *n != "toggle") {

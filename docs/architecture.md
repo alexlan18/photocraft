@@ -472,6 +472,8 @@ psd/src/
     `doc_save`, `doc_export`, `doc_inspect` (layer tree as JSON), `doc_render_preview` (PNG), `doc_select`, `doc_close`.
   - `command_list`, `command_run` and `command_batch`, generated from the registry; `jobs_list` and `jobs_cancel` for background jobs.
   - Bridge only (a running app): `ui_inspect`, `ui_screenshot`, `ui_pointer`, `ui_menu_invoke`, `ui_set`, `control_call`. The full list is in `docs/development.md` › MCP.
+  - One tool per engine command (`server/command_tools.rs`): `filter_blur_gaussianBlur` runs `filter.blur.gaussianBlur` with the arguments as params, described with the label, menu path and parameter doc, so every feature is its own MCP interface.
+  - A third backend, `Backend::Local`, for the desktop app's own Agent panel (Window › Agent): the server runs in process and its tool calls queue on the app's control channel. The agent runner (`agent/`) is a Claude Messages API client whose tools are these MCP tools (built-ins loaded, command tools deferred behind the API's tool search); the shell draws the conversation (`ui-egui/src/agent_ui.rs`) and shares only `photocraft_engine::agent`'s data types with it.
   - Stdio for agent CLIs, and optionally loopback TCP with a token so it can attach to a running GUI.
   - `AuthorizedWorkspace`, which holds independent read and write directory capabilities. Remote
     paths are validated relative names; engine commands that still require ambient filesystem

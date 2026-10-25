@@ -3631,3 +3631,20 @@ curves	Smooth	매끄럽게
 	Grayscale Ramp	회색 음영 램프
 	Current Colors	현재 색상
 	Make Ramp Web Safe	램프를 웹 안전 색상으로 만들기
+	Agent	에이전트
+	Agent settings (Preferences › AI Integrations)	에이전트 설정 (환경 설정 › AI 통합)
+	Clear conversation	대화 지우기
+	Thinking…	생각하는 중…
+	Stopping…	중지하는 중…
+	The agent needs the desktop app.	에이전트는 데스크톱 앱이 필요합니다.
+	Describe an edit, for example “brighten the shadows and add a vignette”. The agent uses PhotoCraft's own commands and shows every step here.	원하는 편집을 설명하세요. 예: “그림자를 밝게 하고 비네트를 추가”. 에이전트는 PhotoCraft 자체 명령을 사용하며 모든 단계를 여기에 표시합니다.
+	Ask the agent to edit the image…	에이전트에게 이미지 편집을 요청…
+	Send	보내기
+	Enter to send, Shift+Enter for a new line	Enter로 보내기, Shift+Enter로 줄 바꿈
+	Tokens: {in} in, {out} out	토큰: 입력 {in}, 출력 {out}
+	Agent model	에이전트 모델
+	Agent effort	에이전트 추론 강도
+	Agent API key	에이전트 API 키
+	Agent API endpoint	에이전트 API 엔드포인트
+	Agent tool rounds per message	메시지당 에이전트 도구 라운드 수
+	Agent refusal fallbacks	에이전트 거부 시 대체

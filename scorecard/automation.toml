@@ -80,3 +80,15 @@ target = "Agent acceptance suite grown to 30-50 workflows"
 status = "partial"
 issue = 219
 note = "automation/tests/it/agent_tasks.rs runs 10 workflows over MCP"
+
+[[item]]
+id = "AUTO-MCP-1"
+target = "Every engine command is its own MCP tool, with its label, menu path and parameter doc"
+status = "done"
+note = "2026-10-25: automation/src/server/command_tools.rs lists one tool per command (937 of 940; command_list, jobs_list and jobs_cancel keep the built-ins), named after the id with underscores, run through the command_run path; mcp.rs every_engine_command_is_a_tool"
+
+[[item]]
+id = "AUTO-AGENT-1"
+target = "In-app agent: a collapsible Agent panel where the user edits the open document in words through the app's MCP tools"
+status = "done"
+note = "2026-10-25: Window › Agent (ui-egui/src/agent_ui.rs); automation/src/agent/ runs the Claude Messages API with the MCP tools (built-ins loaded, command tools behind tool search) over an in-process Backend::Local; Preferences › AI Integrations holds model, effort, key and endpoint; desktop only"

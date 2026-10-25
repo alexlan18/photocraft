@@ -1259,6 +1259,13 @@ fn humanize(key: &str) -> String {
         "darkTheme" => return "Dark Theme".into(),
         "lightTheme" => return "Light Theme".into(),
         "automaticallyCheckUpdates" => return "Automatically Check for Updates".into(),
+        // The Agent panel (Window › Agent).
+        "agentModel" => return "Agent model".into(),
+        "agentEffort" => return "Agent effort".into(),
+        "agentApiKey" => return "Agent API key".into(),
+        "agentBaseUrl" => return "Agent API endpoint".into(),
+        "agentMaxTurns" => return "Agent tool rounds per message".into(),
+        "agentRefusalFallbacks" => return "Agent refusal fallbacks".into(),
         _ => {}
     }
     // These controls appear only for WebP, so reuse the existing translated labels.
@@ -1896,7 +1903,8 @@ fn field_rows(ui: &mut egui::Ui, section: &str, obj: &mut Map<String, Value>, ke
             Value::String(s) => {
                 ui.label(RichText::new(tl!(&label)).color(t.text_dim));
                 let mut s = s.clone();
-                ui.add(egui::TextEdit::singleline(&mut s).desired_width(260.0));
+                // The Agent panel's API key is a secret: shown as dots, like a password field.
+                ui.add(egui::TextEdit::singleline(&mut s).desired_width(260.0).password(path == "integrations.agentApiKey"));
                 obj.insert(k, json!(s));
             }
             Value::Number(n) => {
@@ -4090,9 +4098,11 @@ mod tests {
         assert!(has_visible_fields(&values, "general"));
         assert!(has_visible_fields(&values, "fileHandling"));
         // Every setting of these sections is still unimplemented.
-        for section in ["integrations", "scratchDisks"] {
-            assert!(!has_visible_fields(&values, section), "{section}");
-        }
+        assert!(!has_visible_fields(&values, "scratchDisks"));
+        // AI Integrations: the control-channel rows stay hidden, the Agent panel's rows are live.
+        assert!(has_visible_fields(&values, "integrations"));
+        assert!(prefs::is_hidden("integrations.controlPort"));
+        assert!(!prefs::is_hidden("integrations.agentModel") && !prefs::is_hidden("integrations.agentApiKey"));
         // "Fill new type layers with placeholder text" and "Use Escape to Commit" are live; other Type rows stay hidden.
         assert!(has_visible_fields(&values, "type"));
         assert!(!prefs::is_hidden("type.fillNewTypeLayersWithPlaceholder"));

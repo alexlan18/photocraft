@@ -3089,3 +3089,20 @@ curves	Smooth	平滑
 	Exported {path}	已导出 {path}
 	Exported {n} files	已导出 {n} 个文件
 	Driver: {driver}	驱动程序：{driver}
+	Agent	智能体
+	Agent settings (Preferences › AI Integrations)	智能体设置（首选项 › AI 集成）
+	Clear conversation	清除对话
+	Thinking…	思考中…
+	Stopping…	正在停止…
+	The agent needs the desktop app.	智能体需要桌面版应用。
+	Describe an edit, for example “brighten the shadows and add a vignette”. The agent uses PhotoCraft's own commands and shows every step here.	描述一个编辑，例如“提亮阴影并添加晕影”。智能体使用 PhotoCraft 自身的命令，并在此显示每一步。
+	Ask the agent to edit the image…	让智能体编辑图像…
+	Send	发送
+	Enter to send, Shift+Enter for a new line	Enter 发送，Shift+Enter 换行
+	Tokens: {in} in, {out} out	令牌：输入 {in}，输出 {out}
+	Agent model	智能体模型
+	Agent effort	智能体推理强度
+	Agent API key	智能体 API 密钥
+	Agent API endpoint	智能体 API 端点
+	Agent tool rounds per message	每条消息的智能体工具轮数
+	Agent refusal fallbacks	智能体拒绝回退

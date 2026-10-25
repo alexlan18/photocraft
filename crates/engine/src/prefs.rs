@@ -936,11 +936,34 @@ pub struct Integrations {
     pub allow_agent_control: bool,
     /// Default control port (0 = only when `--control` is given).
     pub control_port: u32,
+    /// The Agent panel (Window › Agent): the Claude model id; empty = the default
+    /// ([`crate::agent::DEFAULT_MODEL`]).
+    pub agent_model: String,
+    /// The Agent panel's `effort` (low, medium, high, xhigh, max).
+    pub agent_effort: String,
+    /// The Agent panel's API key; empty = the `ANTHROPIC_API_KEY` environment variable. Stored in
+    /// the settings file as entered.
+    pub agent_api_key: String,
+    /// The Messages API origin the Agent panel calls; empty = `https://api.anthropic.com`.
+    pub agent_base_url: String,
+    /// Tool-use rounds one message may take before the Agent panel stops and asks to continue.
+    pub agent_max_turns: u32,
+    /// Let the API answer with another model when the chosen one declines a request.
+    pub agent_refusal_fallbacks: bool,
 }
 
 impl Default for Integrations {
     fn default() -> Self {
-        Self { allow_agent_control: true, control_port: 0 }
+        Self {
+            allow_agent_control: true,
+            control_port: 0,
+            agent_model: String::new(),
+            agent_effort: crate::agent::DEFAULT_EFFORT.into(),
+            agent_api_key: String::new(),
+            agent_base_url: String::new(),
+            agent_max_turns: crate::agent::DEFAULT_MAX_TURNS,
+            agent_refusal_fallbacks: true,
+        }
     }
 }
 
@@ -1170,6 +1193,7 @@ pub fn choices(path: &str) -> Option<&'static [&'static str]> {
         "interface.canvasColor" => CanvasColor::NAMES,
         "interface.canvasBorder" => CanvasBorder::NAMES,
         "interface.uiScale" => UiScale::NAMES,
+        "integrations.agentEffort" => crate::agent::EFFORT_LEVELS,
         "interface.uiFontSize" => UiFontSize::NAMES,
         "historyLog.destination" => LogDestination::NAMES,
         "historyLog.detail" => LogDetail::NAMES,
@@ -1222,6 +1246,7 @@ pub fn range(path: &str) -> Option<(f64, f64)> {
         "layerMaskOverlay.opacity" => (0.0, 100.0),
         "type.recentFonts" => (0.0, 50.0),
         "integrations.controlPort" => (0.0, 65535.0),
+        "integrations.agentMaxTurns" => (1.0, 1000.0),
         _ => return None,
     })
 }

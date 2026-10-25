@@ -16,6 +16,7 @@ macro_rules! tl {
 
 pub mod actions;
 pub mod adjust_dialog;
+pub mod agent_ui;
 pub mod adjust_editors;
 pub mod adjust_preview;
 pub mod adjust_ui;
@@ -609,6 +610,9 @@ pub struct Services {
     pub beep: Option<fn()>,
     /// Starts a background check for published releases (desktop, outside Flatpak).
     pub check_updates: Option<photocraft_engine::updates_cmds::CheckFn>,
+    /// Starts an Agent panel session (desktop: `photocraft-automation`'s runner over the app's
+    /// own MCP server). `None` on the web, where the panel says so.
+    pub agent_host: Option<photocraft_engine::agent::AgentHostFn>,
     /// Files delivered asynchronously (web drag-and-drop): drained every frame and opened as
     /// documents.
     pub inbox: Option<Inbox>,
@@ -693,6 +697,8 @@ pub struct PhotocraftApp {
     pub session: Session,
     pub ui: UiState,
     pub services: Services,
+    /// The Agent panel's live session and decoded images (`agent_ui`).
+    pub agent: agent_ui::AgentRuntime,
     /// Canvas caches per (document, display): CPU textures hold monitor values; the GPU
     /// canvas state is shared (`canvas::GPU_OUTPUT`).
     canvases: HashMap<(DocId, u32), canvas::CanvasCache>,
@@ -1039,6 +1045,7 @@ impl PhotocraftApp {
             live_stroke: None,
             committed_stroke: None,
             retouch_from_live: false,
+            agent: agent_ui::AgentRuntime::default(),
             trail: None,
             remove_pending: Vec::new(),
             remove_pending_target: None,

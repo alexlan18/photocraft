@@ -3433,3 +3433,20 @@ curves	Smooth	Glätten
 	Grayscale Ramp	Graustufenbalken
 	Current Colors	Aktuelle Farben
 	Make Ramp Web Safe	Farbbalken auf Webfarben beschränken
+	Agent	Agent
+	Agent settings (Preferences › AI Integrations)	Agent-Einstellungen (Voreinstellungen › KI-Integrationen)
+	Clear conversation	Unterhaltung löschen
+	Thinking…	Denkt nach…
+	Stopping…	Wird gestoppt…
+	The agent needs the desktop app.	Der Agent benötigt die Desktop-App.
+	Describe an edit, for example “brighten the shadows and add a vignette”. The agent uses PhotoCraft's own commands and shows every step here.	Beschreiben Sie eine Bearbeitung, zum Beispiel „Schatten aufhellen und eine Vignette hinzufügen“. Der Agent verwendet die Befehle von PhotoCraft und zeigt hier jeden Schritt.
+	Ask the agent to edit the image…	Den Agenten bitten, das Bild zu bearbeiten…
+	Send	Senden
+	Enter to send, Shift+Enter for a new line	Eingabe sendet, Umschalt+Eingabe für eine neue Zeile
+	Tokens: {in} in, {out} out	Token: {in} Eingabe, {out} Ausgabe
+	Agent model	Agent-Modell
+	Agent effort	Agent-Aufwand
+	Agent API key	Agent-API-Schlüssel
+	Agent API endpoint	Agent-API-Endpunkt
+	Agent tool rounds per message	Agent-Werkzeugrunden pro Nachricht
+	Agent refusal fallbacks	Agent-Ausweichmodelle bei Ablehnung
